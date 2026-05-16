@@ -1,12 +1,13 @@
 require('dotenv').config();
 const express = require('express');
 const fs = require('fs');
+const path = require('path'); // Necessário para enviar o index.html
 
 const app = express();
 app.use(express.json());
 
 const PORT = process.env.PORT || 3000;
-const PASSWORD = process.env.ADMIN_PASSWORD; // Puxa a senha do ENV
+const PASSWORD = process.env.ADMIN_PASSWORD;
 const DB_FILE = './links.json';
 
 // Função para carregar os links salvos
@@ -24,27 +25,28 @@ const saveLinks = (links) => {
 };
 
 // ==========================================
-// 1. API: Listar todos (Máximo 200, mais recentes primeiro)
+// 1. Rota da Página Inicial (Index)
+// ==========================================
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'));
+});
+
+// ==========================================
+// 2. API: Listar todos
 // ==========================================
 app.get('/api/all', (req, res) => {
     const links = loadLinks();
-    
-    // Ordena por data (decrescente/mais novo pro mais velho)
     const sortedLinks = links.sort((a, b) => new Date(b.date) - new Date(a.date));
-    
-    // Pega apenas os 200 primeiros
     const top200 = sortedLinks.slice(0, 200);
-    
     res.json(top200);
 });
 
 // ==========================================
-// 2. API: Adicionar um Link
+// 3. API: Adicionar um Link
 // ==========================================
 app.post('/api/add', (req, res) => {
     const { url, name, password } = req.body;
 
-    // Verifica a senha do ENV
     if (password !== PASSWORD) {
         return res.status(401).json({ error: "Acesso Negado: Senha incorreta" });
     }
@@ -53,15 +55,13 @@ app.post('/api/add', (req, res) => {
     }
 
     let links = loadLinks();
-
-    // Se já existir um link com esse nome, remove para substituir
-    links = links.filter(l => l.name !== name);
+    links = links.filter(l => l.name !== name); // Remove se já existir para substituir
 
     const newLink = {
-        id: Date.now().toString(), // ID único baseado no tempo
-        name: name,
-        url: url,
-        date: new Date().toISOString() // Salva a data atual
+        id: Date.now().toString(),
+         name: name,
+         url: url,
+         date: new Date().toISOString()
     };
 
     links.push(newLink);
@@ -71,37 +71,16 @@ app.post('/api/add', (req, res) => {
 });
 
 // ==========================================
-// 3. API: Remover um Link
-// ==========================================
-app.post('/api/remove', (req, res) => {
-    const { name, password } = req.body;
-
-    if (password !== PASSWORD) {
-        return res.status(401).json({ error: "Acesso Negado: Senha incorreta" });
-    }
-
-    let links = loadLinks();
-    const tamanhoOriginal = links.length;
-    
-    links = links.filter(l => l.name !== name);
-    saveLinks(links);
-
-    if (links.length < tamanhoOriginal) {
-        res.json({ message: `Link /${name} deletado com sucesso!` });
-    } else {
-        res.status(404).json({ error: "Link não encontrado!" });
-    }
-});
-
-// ==========================================
-// 4. Redirecionamento Final (meu-site.com/onome)
+// 4. Redirecionamento Final (DEVE SER A ÚLTIMA ROTA)
 // ==========================================
 app.get('/:name', (req, res) => {
+    // Evita que o navegador tente buscar um favicon e acabe buscando um link
+    if (req.params.name === 'favicon.ico') return res.status(204).end();
+
     const links = loadLinks();
     const linkBuscado = links.find(l => l.name === req.params.name);
 
     if (linkBuscado) {
-        // Manda o usuário para a URL original
         res.redirect(linkBuscado.url);
     } else {
         res.status(404).send("Link não encontrado.");
