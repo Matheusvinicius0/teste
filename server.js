@@ -3,17 +3,21 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Serve os arquivos estáticos da mesma pasta
 app.use(express.static(__dirname));
 
-// Rota para expor a variável de ambiente de forma controlada
+// Rota antiga de configuração
 app.get('/api/config', (req, res) => {
-    res.json({
-        CHAVE_FIXA: process.env.CHAVE_FIXA || ""
-    });
+    res.json({ CHAVE_FIXA: process.env.CHAVE_FIXA || "" });
 });
 
-// Qualquer outra rota redireciona para o index.html
+// ==========================================
+// NOVA ROTA: Entrega o seu novo HTML de API
+// ==========================================
+app.get('/api/all', (req, res) => {
+    res.sendFile(path.join(__dirname, 'all.html'));
+});
+
+// Qualquer outra rota redireciona para o index.html principal
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });

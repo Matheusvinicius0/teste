@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>API Fenixflix - All</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 15px;
+            background-color: #0d1117;
+            color: #58d68d;
+            font-family: 'Courier New', Courier, monospace;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <script>
+        // O identificador da sua pasta no Internet Archive
+        const IA_IDENTIFIER = 'fenix-json';
+
+        async function carregarAPI() {
+            try {
+                // Mensagem inicial enquanto a "API" carrega
+                document.body.innerText = "Buscando dados no servidor...";
+
+                // Busca a lista de arquivos no Internet Archive com um "timestamp" para evitar cache antigo
+                const response = await fetch(`https://archive.org/metadata/${IA_IDENTIFIER}?t=${new Date().getTime()}`);
+                
+                if (!response.ok) {
+                    throw new Error("Falha ao buscar metadados no Internet Archive.");
+                }
+                
+                const data = await response.json();
+                const files = data.files || [];
+
+                // 1. Filtra para pegar apenas os seus arquivos (os .enc)
+                let arquivosFiltrados = files.filter(f => f.name.endsWith('.enc'));
+
+                // 2. Ordena pela data de modificação (mtime), do mais RECENTE para o mais antigo
+                arquivosFiltrados.sort((a, b) => parseInt(b.mtime) - parseInt(a.mtime));
+
+                // 3. Corta a lista para pegar apenas os 200 primeiros
+                const top200 = arquivosFiltrados.slice(0, 200);
+
+                // 4. Formata a saída (mostrando apenas os metadados, sem o conteúdo interno)
+                const resultadoLimpo = top200.map(arquivo => {
+                    const dataLegivel = new Date(parseInt(arquivo.mtime) * 1000).toLocaleString('pt-BR');
+                    return {
+                        id: arquivo.name.replace('.enc', ''),
+                        arquivo_completo: arquivo.name,
+                        tamanho: arquivo.size + " bytes",
+                        data_atualizacao: dataLegivel
+                    };
+                });
+
+                // Cria a estrutura do JSON que vai aparecer na tela
+                const respostaFinal = {
+                    sucesso: true,
+                    total_mostrado: resultadoLimpo.length,
+                    arquivos: resultadoLimpo
+                };
+
+                // 5. Apaga a mensagem inicial e escreve SÓ o JSON formatado na tela
+                document.body.innerText = JSON.stringify(respostaFinal, null, 4);
+
+            } catch (error) {
+                // Em caso de erro, exibe o erro também em formato JSON
+                const erroFinal = { 
+                    sucesso: false, 
+                    erro: "Ocorreu um erro ao buscar os arquivos.",
+                    detalhe: error.message
+                };
+                document.body.innerText = JSON.stringify(erroFinal, null, 4);
+                document.body.style.color = "#ff5252"; // Fica vermelho se der erro
+            }
+        }
+
+        // Executa a função imediatamente assim que a página é acessada
+        carregarAPI();
+    </script>
+</body>
+</html>
