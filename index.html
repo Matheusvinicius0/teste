@@ -3,117 +3,38 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Visualizador JSON - Fenixflix</title>
+    <title>Fenixflix API</title>
     <style>
-        body { 
-            font-family: monospace; 
-            background-color: #121212; 
-            color: #e0e0e0; 
-            padding: 20px; 
-            max-width: 800px; 
-            margin: 0 auto; 
-        }
-        .container { 
-            background-color: #1e1e1e; 
-            padding: 20px; 
-            border-radius: 8px; 
-            box-shadow: 0 4px 6px rgba(0,0,0,0.3); 
-        }
-        h2 { 
-            margin-top: 0; 
-            color: #4CAF50; 
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .btn-limpar-senha {
-            background-color: #ff5252;
-            color: white;
-            border: none;
-            padding: 5px 10px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 12px;
-        }
-        .file-result { 
-            margin-top: 20px; 
-            background-color: #2d2d2d; 
-            padding: 15px; 
-            border-radius: 4px; 
-        }
-        .file-result h3 { 
-            margin-top: 0; 
-            border-bottom: 1px solid #444; 
-            padding-bottom: 10px; 
-        }
-        .file-list-item {
-            margin-top: 15px;
-            background-color: #252525;
-            padding: 15px;
-            border-radius: 4px;
-            border-left: 4px solid #4CAF50;
-        }
-        .file-list-item h3 {
+        /* Estilos apenas para a lista principal */
+        body {
+            background-color: #0d1117;
+            color: #c9d1d9;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
             margin: 0;
-            font-size: 18px;
+            padding: 20px;
         }
-        .file-list-item a {
-            color: #fff;
-            text-decoration: none;
-        }
-        .file-list-item a:hover {
-            color: #4CAF50;
-            text-decoration: underline;
-        }
-        .file-list-item p {
-            color: #aaa;
-            margin: 8px 0 0 0;
-            font-size: 14px;
-        }
-        pre { 
-            background-color: #1e1e1e; 
-            padding: 15px; 
-            border-radius: 4px; 
-            overflow-x: auto; 
-            white-space: pre-wrap; 
-            word-wrap: break-word; 
-            color: #a5d6ff; 
-        }
-        .loading { 
-            font-style: italic; 
-            color: #aaa; 
-        }
-        .btn-voltar {
-            display: inline-block;
-            margin-bottom: 15px;
-            background-color: #444;
-            color: #fff;
-            padding: 8px 12px;
-            text-decoration: none;
-            border-radius: 4px;
-            font-size: 14px;
-        }
-        .btn-voltar:hover {
-            background-color: #666;
-        }
+        .container { max-width: 800px; margin: 0 auto; }
+        h2 { border-bottom: 1px solid #30363d; padding-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+        .btn-limpar-senha { background: #da3633; color: white; border: none; padding: 5px 10px; border-radius: 5px; cursor: pointer; font-size: 12px; }
+        .file-list-item { background: #161b22; border: 1px solid #30363d; padding: 15px; border-radius: 6px; margin-bottom: 10px; }
+        .file-list-item h3 { margin: 0; font-size: 16px; }
+        .file-list-item a { color: #58a6ff; text-decoration: none; }
+        .file-list-item p { margin: 5px 0 0; font-size: 12px; color: #8b949e; }
+        .loading { color: #8b949e; }
     </style>
 </head>
 <body>
 
-    <div class="container">
+    <div id="ui-layout" class="container">
         <h2>
             Arquivos Fenix JSON
             <button class="btn-limpar-senha" onclick="limparSenha()">Sair / Limpar Senha</button>
         </h2>
         <p id="statusText" class="loading">Iniciando sistema...</p>
-        
         <div id="resultadosContainer"></div>
     </div>
 
     <script>
-        // ==========================================
-        // CONFIGURAÇÕES PRINCIPAIS
-        // ==========================================
         const IA_IDENTIFIER = 'fenix-json'; 
         const IA_METADATA_URL = `https://archive.org/metadata/${IA_IDENTIFIER}`;
         const IA_DOWNLOAD_BASE = `https://archive.org/cors/${IA_IDENTIFIER}/`;
@@ -121,42 +42,23 @@
         let CHAVE_FIXA = ""; 
         let SENHA = "";
 
-        // ==========================================
-        // CARREGAR CONFIGURAÇÃO GERADA PELO RENDER
-        // ==========================================
         async function carregarConfiguracao() {
             try {
-                // Tenta ler o arquivo que o Render criou durante o comando de Build
-                const response = await fetch('config.json');
+                const response = await fetch('api/config');
                 if (response.ok) {
                     const config = await response.json();
                     CHAVE_FIXA = config.CHAVE_FIXA || "";
                 }
-            } catch (e) {
-                console.log("Arquivo config.json não encontrado. Usando fallback de senha.");
-            }
+            } catch (e) { console.log("Config não encontrada."); }
         }
 
-        // ==========================================
-        // GERENCIAMENTO DE SENHA
-        // ==========================================
         function solicitarSenha() {
-            if (CHAVE_FIXA) {
-                SENHA = CHAVE_FIXA;
-                return;
-            }
-
+            if (CHAVE_FIXA) { SENHA = CHAVE_FIXA; return; }
             SENHA = sessionStorage.getItem('fenix_key');
-
             if (!SENHA) {
-                SENHA = prompt("🔒 Digite a KEY de criptografia para visualizar os links:");
-                if (SENHA) {
-                    sessionStorage.setItem('fenix_key', SENHA);
-                } else {
-                    document.getElementById('statusText').textContent = "Acesso negado. Atualize a página para digitar a senha.";
-                    document.getElementById('statusText').style.color = "#ff5252";
-                    throw new Error("Senha não fornecida.");
-                }
+                SENHA = prompt("🔒 Digite a KEY de criptografia:");
+                if (SENHA) { sessionStorage.setItem('fenix_key', SENHA); } 
+                else { location.reload(); }
             }
         }
 
@@ -165,140 +67,93 @@
             window.location.href = window.location.pathname;
         }
 
-        // ==========================================
-        // FUNÇÃO DE DESCRIPTOGRAFIA (HEX + XOR)
-        // ==========================================
+        // Sua lógica de descriptografia mantida
         function xorDecryptFromHex(hexText, keyStr) {
             try {
                 const encryptedBytes = new Uint8Array(hexText.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
                 const encoder = new TextEncoder();
                 const keyBytes = encoder.encode(keyStr);
                 const decryptedBytes = new Uint8Array(encryptedBytes.length);
-
                 for (let i = 0; i < encryptedBytes.length; i++) {
                     decryptedBytes[i] = encryptedBytes[i] ^ keyBytes[i % keyBytes.length];
                 }
-
-                const decoder = new TextDecoder('utf-8');
-                return decoder.decode(decryptedBytes);
-            } catch (e) {
-                return hexText;
-            }
+                return new TextDecoder('utf-8').decode(decryptedBytes);
+            } catch (e) { return hexText; }
         }
 
-        // ==========================================
-        // FUNÇÃO DE INICIALIZAÇÃO
-        // ==========================================
         async function iniciarSistema() {
             await carregarConfiguracao();
+            solicitarSenha();
 
-            try {
-                solicitarSenha();
-            } catch (e) {
-                return;
-            }
-
-            const statusText = document.getElementById('statusText');
-            const resultadosContainer = document.getElementById('resultadosContainer');
-            
             const urlParams = new URLSearchParams(window.location.search);
             const arquivoEspecifico = urlParams.get('file');
 
             if (arquivoEspecifico) {
-                statusText.textContent = `Buscando e lendo: ${arquivoEspecifico}...`;
-                resultadosContainer.innerHTML = '<a href="?" class="btn-voltar">⬅ Voltar para a lista</a>';
-                
-                const nomeComEnc = arquivoEspecifico.endsWith('.enc') ? arquivoEspecifico : arquivoEspecifico + '.enc';
-                await baixarEDescriptografar(nomeComEnc, resultadosContainer);
-                
-                statusText.textContent = "Arquivo lido e links descriptografados com sucesso!";
-                statusText.style.color = "#4CAF50";
+                // MODO JSON PURO: Remove toda a interface antes de processar
+                document.getElementById('ui-layout').remove();
+                await exibirApenasJSON(arquivoEspecifico);
                 return;
             }
 
-            try {
-                statusText.textContent = "Buscando lista de arquivos no Internet Archive...";
-                
-                const response = await fetch(IA_METADATA_URL + '?t=' + new Date().getTime());
-                if (!response.ok) throw new Error("Falha ao acessar os metadados do Archive.");
-                const data = await response.json();
-                
-                const arquivos = data.files.filter(f => f.name.endsWith('.enc'));
-                
-                if (arquivos.length === 0) {
-                    statusText.textContent = "Nenhum arquivo criptografado (.enc) encontrado.";
-                    return;
-                }
-
-                statusText.textContent = `${arquivos.length} arquivo(s) encontrado(s). Clique em um arquivo para ler.`;
-                statusText.style.color = "#aaa";
-
-                arquivos.forEach(arquivo => {
-                    const nomeLimpo = arquivo.name.replace('.enc', ''); 
-                    const dataModificacao = new Date(parseInt(arquivo.mtime) * 1000).toLocaleString('pt-BR');
-                    
-                    const div = document.createElement('div');
-                    div.className = 'file-list-item';
-                    div.innerHTML = `
-                        <h3><a href="?file=${nomeLimpo}">📄 ${nomeLimpo}</a></h3>
-                        <p>📅 Modificado em: ${dataModificacao}</p>
-                    `;
-                    resultadosContainer.appendChild(div);
-                });
-
-            } catch (error) {
-                console.error("Erro geral:", error);
-                statusText.textContent = "Erro ao se conectar com o Internet Archive.";
-                statusText.style.color = "#ff5252";
-            }
+            // MODO LISTA: Carrega interface normal
+            carregarListaArquivos();
         }
 
-        // ==========================================
-        // FUNÇÃO DE DOWNLOAD E PROCESSAMENTO
-        // ==========================================
-        async function baixarEDescriptografar(nomeArquivo, containerPrincipal) {
+        async function exibirApenasJSON(id) {
             try {
-                const fileUrl = IA_DOWNLOAD_BASE + nomeArquivo;
-                const response = await fetch(fileUrl);
-                
-                if (!response.ok) throw new Error("Erro no download ou bloqueio de CORS.");
+                const nomeComEnc = id.endsWith('.enc') ? id : id + '.enc';
+                const response = await fetch(IA_DOWNLOAD_BASE + nomeComEnc);
+                if (!response.ok) throw new Error("Não encontrado");
 
                 const jsonObj = await response.json();
 
+                // Processa descriptografia dos links nos streams
                 if (jsonObj.streams) {
+                    const processar = (s) => { if (s.url) s.url = xorDecryptFromHex(s.url, SENHA); };
                     if (Array.isArray(jsonObj.streams)) {
-                        jsonObj.streams.forEach(stream => {
-                            if (stream.url) stream.url = xorDecryptFromHex(stream.url, SENHA);
-                        });
+                        jsonObj.streams.forEach(processar);
                     } else {
-                        for (const season in jsonObj.streams) {
-                            for (const ep in jsonObj.streams[season]) {
-                                jsonObj.streams[season][ep].forEach(stream => {
-                                    if (stream.url) stream.url = xorDecryptFromHex(stream.url, SENHA);
-                                });
-                            }
-                        }
+                        for (const s in jsonObj.streams) 
+                            for (const e in jsonObj.streams[s]) 
+                                jsonObj.streams[s][e].forEach(processar);
                     }
                 }
 
-                const div = document.createElement('div');
-                div.className = 'file-result';
-                div.innerHTML = `
-                    <h3>📄 ${nomeArquivo.replace('.enc', '')}</h3>
-                    <pre>${JSON.stringify(jsonObj, null, 4)}</pre>
-                `;
-                containerPrincipal.appendChild(div);
+                // LIMPEZA TOTAL E EXIBIÇÃO DO JSON
+                document.body.innerHTML = ""; 
+                document.body.style.margin = "0";
+                document.body.style.padding = "20px";
+                document.body.style.backgroundColor = "#0d1117";
+                document.body.style.color = "#7ee787"; // Cor verde estilo terminal
+                document.body.style.fontFamily = "'Courier New', monospace";
+                document.body.style.whiteSpace = "pre";
+                
+                // Exibe o JSON formatado como texto puro
+                document.body.innerText = JSON.stringify(jsonObj, null, 4);
 
-            } catch (error) {
-                console.error(`Erro ao descriptografar ${nomeArquivo}:`, error);
-                const div = document.createElement('div');
-                div.className = 'file-result';
-                div.innerHTML = `
-                    <h3 style="color: #ff5252;">❌ Erro em: ${nomeArquivo}</h3>
-                    <p style="color: #ff5252;">O arquivo pode não existir ou a chave que você digitou está incorreta.</p>
-                `;
-                containerPrincipal.appendChild(div);
+            } catch (e) {
+                document.body.innerHTML = `<pre style="color:red">Erro: ${e.message}</pre>`;
             }
+        }
+
+        async function carregarListaArquivos() {
+            const statusText = document.getElementById('statusText');
+            const container = document.getElementById('resultadosContainer');
+            try {
+                const response = await fetch(IA_METADATA_URL + '?t=' + Date.now());
+                const data = await response.json();
+                const arquivos = data.files.filter(f => f.name.endsWith('.enc'));
+                
+                statusText.textContent = `${arquivos.length} arquivos encontrados.`;
+                
+                arquivos.forEach(f => {
+                    const nome = f.name.replace('.enc', '');
+                    const div = document.createElement('div');
+                    div.className = 'file-list-item';
+                    div.innerHTML = `<h3><a href="?file=${nome}">📄 ${nome}</a></h3><p>Modificado: ${new Date(parseInt(f.mtime)*1000).toLocaleString()}</p>`;
+                    container.appendChild(div);
+                });
+            } catch (e) { statusText.textContent = "Erro ao carregar lista."; }
         }
 
         iniciarSistema();
