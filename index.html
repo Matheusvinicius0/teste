@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visualizador JSON - Fenixflix</title>
+    <style>
+        body { 
+            font-family: monospace; 
+            background-color: #121212; 
+            color: #e0e0e0; 
+            padding: 20px; 
+            max-width: 800px; 
+            margin: 0 auto; 
+        }
+        .container { 
+            background-color: #1e1e1e; 
+            padding: 20px; 
+            border-radius: 8px; 
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3); 
+        }
+        h2 { 
+            margin-top: 0; 
+            color: #4CAF50; 
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .btn-limpar-senha {
+            background-color: #ff5252;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .file-result { 
+            margin-top: 20px; 
+            background-color: #2d2d2d; 
+            padding: 15px; 
+            border-radius: 4px; 
+        }
+        .file-result h3 { 
+            margin-top: 0; 
+            border-bottom: 1px solid #444; 
+            padding-bottom: 10px; 
+        }
+        .file-list-item {
+            margin-top: 15px;
+            background-color: #252525;
+            padding: 15px;
+            border-radius: 4px;
+            border-left: 4px solid #4CAF50;
+        }
+        .file-list-item h3 {
+            margin: 0;
+            font-size: 18px;
+        }
+        .file-list-item a {
+            color: #fff;
+            text-decoration: none;
+        }
+        .file-list-item a:hover {
+            color: #4CAF50;
+            text-decoration: underline;
+        }
+        .file-list-item p {
+            color: #aaa;
+            margin: 8px 0 0 0;
+            font-size: 14px;
+        }
+        pre { 
+            background-color: #1e1e1e; 
+            padding: 15px; 
+            border-radius: 4px; 
+            overflow-x: auto; 
+            white-space: pre-wrap; 
+            word-wrap: break-word; 
+            color: #a5d6ff; 
+        }
+        .loading { 
+            font-style: italic; 
+            color: #aaa; 
+        }
+        .btn-voltar {
+            display: inline-block;
+            margin-bottom: 15px;
+            background-color: #444;
+            color: #fff;
+            padding: 8px 12px;
+            text-decoration: none;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .btn-voltar:hover {
+            background-color: #666;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h2>
+            Arquivos Fenix JSON
+            <button class="btn-limpar-senha" onclick="limparSenha()">Sair / Limpar Senha</button>
+        </h2>
+        <p id="statusText" class="loading">Iniciando sistema...</p>
+        
+        <div id="resultadosContainer"></div>
+    </div>
+
+    <script>
+        // ==========================================
+        // CONFIGURAÇÕES PRINCIPAIS
+        // ==========================================
+        const IA_IDENTIFIER = 'fenix-json'; 
+        const IA_METADATA_URL = `https://archive.org/metadata/${IA_IDENTIFIER}`;
+        const IA_DOWNLOAD_BASE = `https://archive.org/cors/${IA_IDENTIFIER}/`;
+
+        let SENHA = "";
+
+        // ==========================================
+        // GERENCIAMENTO DE SENHA (Substitui o .env)
+        // ==========================================
+        function solicitarSenha() {
+            SENHA = sessionStorage.getItem('fenix_key');
+            if (!SENHA) {
+                SENHA = prompt("🔒 Digite a KEY de criptografia para visualizar os links:");
+                if (SENHA) {
+                    sessionStorage.setItem('fenix_key', SENHA);
+                } else {
+                    document.getElementById('statusText').textContent = "Acesso negado. Atualize a página para digitar a senha.";
+                    document.getElementById('statusText').style.color = "#ff5252";
+                    throw new Error("Senha não fornecida.");
+                }
+            }
+        }
+
+        function limparSenha() {
+            sessionStorage.removeItem('fenix_key');
+            window.location.href = window.location.pathname; // Recarrega a página limpando a URL
+        }
+
+        // ==========================================
+        // FUNÇÃO DE DESCRIPTOGRAFIA (HEX + XOR)
+        // ==========================================
+        function xorDecryptFromHex(hexText, keyStr) {
+            try {
+                const encryptedBytes = new Uint8Array(hexText.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
+                const encoder = new TextEncoder();
+                const keyBytes = encoder.encode(keyStr);
+                const decryptedBytes = new Uint8Array(encryptedBytes.length);
+
+                for (let i = 0; i < encryptedBytes.length; i++) {
+                    decryptedBytes[i] = encryptedBytes[i] ^ keyBytes[i % keyBytes.length];
+                }
+
+                const decoder = new TextDecoder('utf-8');
+                return decoder.decode(decryptedBytes);
+            } catch (e) {
+                return hexText; // Se falhar, retorna o texto original
+            }
+        }
+
+        // ==========================================
+        // FUNÇÃO DE INICIALIZAÇÃO
+        // ==========================================
+        async function iniciarSistema() {
+            try {
+                solicitarSenha(); // Pede ou resgata a senha invisível
+            } catch (e) {
+                return; // Para tudo se o usuário cancelar a senha
+            }
+
+            const statusText = document.getElementById('statusText');
+            const resultadosContainer = document.getElementById('resultadosContainer');
+            
+            const urlParams = new URLSearchParams(window.location.search);
+            const arquivoEspecifico = urlParams.get('file');
+
+            // --- MODO 1: ARQUIVO ESPECÍFICO (Mostra o JSON descriptografado) ---
+            if (arquivoEspecifico) {
+                statusText.textContent = `Buscando e lendo: ${arquivoEspecifico}...`;
+                
+                resultadosContainer.innerHTML = '<a href="?" class="btn-voltar">⬅ Voltar para a lista</a>';
+                
+                const nomeComEnc = arquivoEspecifico.endsWith('.enc') ? arquivoEspecifico : arquivoEspecifico + '.enc';
+                await baixarEDescriptografar(nomeComEnc, resultadosContainer);
+                
+                statusText.textContent = "Arquivo lido e links descriptografados com sucesso!";
+                statusText.style.color = "#4CAF50";
+                return;
+            }
+
+            // --- MODO 2: LISTA NORMAL ---
+            try {
+                statusText.textContent = "Buscando lista de arquivos no Internet Archive...";
+                
+                const response = await fetch(IA_METADATA_URL + '?t=' + new Date().getTime());
+                if (!response.ok) throw new Error("Falha ao acessar os metadados do Archive.");
+                const data = await response.json();
+                
+                const arquivos = data.files.filter(f => f.name.endsWith('.enc'));
+                
+                if (arquivos.length === 0) {
+                    statusText.textContent = "Nenhum arquivo criptografado (.enc) encontrado.";
+                    return;
+                }
+
+                statusText.textContent = `${arquivos.length} arquivo(s) encontrado(s). Clique em um arquivo para ler.`;
+                statusText.style.color = "#aaa";
+
+                arquivos.forEach(arquivo => {
+                    const nomeLimpo = arquivo.name.replace('.enc', ''); 
+                    const dataModificacao = new Date(parseInt(arquivo.mtime) * 1000).toLocaleString('pt-BR');
+                    
+                    const div = document.createElement('div');
+                    div.className = 'file-list-item';
+                    div.innerHTML = `
+                        <h3><a href="?file=${nomeLimpo}">📄 ${nomeLimpo}</a></h3>
+                        <p>📅 Modificado em: ${dataModificacao}</p>
+                    `;
+                    resultadosContainer.appendChild(div);
+                });
+
+            } catch (error) {
+                console.error("Erro geral:", error);
+                statusText.textContent = "Erro ao se conectar com o Internet Archive.";
+                statusText.style.color = "#ff5252";
+            }
+        }
+
+        // ==========================================
+        // FUNÇÃO DE DOWNLOAD E PROCESSAMENTO
+        // ==========================================
+        async function baixarEDescriptografar(nomeArquivo, containerPrincipal) {
+            try {
+                const fileUrl = IA_DOWNLOAD_BASE + nomeArquivo;
+                const response = await fetch(fileUrl);
+                
+                if (!response.ok) throw new Error("Erro no download ou bloqueio de CORS.");
+
+                const jsonObj = await response.json();
+
+                // Navega pelo JSON e descriptografa apenas as URLs
+                if (jsonObj.streams) {
+                    if (Array.isArray(jsonObj.streams)) {
+                        jsonObj.streams.forEach(stream => {
+                            if (stream.url) stream.url = xorDecryptFromHex(stream.url, SENHA);
+                        });
+                    } else {
+                        for (const season in jsonObj.streams) {
+                            for (const ep in jsonObj.streams[season]) {
+                                jsonObj.streams[season][ep].forEach(stream => {
+                                    if (stream.url) stream.url = xorDecryptFromHex(stream.url, SENHA);
+                                });
+                            }
+                        }
+                    }
+                }
+
+                const div = document.createElement('div');
+                div.className = 'file-result';
+                div.innerHTML = `
+                    <h3>📄 ${nomeArquivo.replace('.enc', '')}</h3>
+                    <pre>${JSON.stringify(jsonObj, null, 4)}</pre>
+                `;
+                containerPrincipal.appendChild(div);
+
+            } catch (error) {
+                console.error(`Erro ao descriptografar ${nomeArquivo}:`, error);
+                const div = document.createElement('div');
+                div.className = 'file-result';
+                div.innerHTML = `
+                    <h3 style="color: #ff5252;">❌ Erro em: ${nomeArquivo}</h3>
+                    <p style="color: #ff5252;">O arquivo pode não existir ou a chave que você digitou está incorreta.</p>
+                `;
+                containerPrincipal.appendChild(div);
+            }
+        }
+
+        // Inicia o sistema
+        iniciarSistema();
+    </script>
+</body>
+</html>
