@@ -1,75 +1,114 @@
+require('dotenv').config();
 const express = require('express');
+const fs = require('fs');
+
 const app = express();
+app.use(express.json());
+
 const PORT = process.env.PORT || 3000;
+const PASSWORD = process.env.ADMIN_PASSWORD; // Puxa a senha do ENV
+const DB_FILE = './links.json';
 
-// O identificador da sua pasta no Internet Archive
-const IA_IDENTIFIER = 'fenix-json';
+// Função para carregar os links salvos
+const loadLinks = () => {
+    if (fs.existsSync(DB_FILE)) {
+        const data = fs.readFileSync(DB_FILE, 'utf8');
+        return data ? JSON.parse(data) : [];
+    }
+    return [];
+};
 
-// Rota antiga de configuração
-app.get('/api/config', (req, res) => {
-    res.json({ CHAVE_FIXA: process.env.CHAVE_FIXA || "" });
+// Função para salvar no JSON
+const saveLinks = (links) => {
+    fs.writeFileSync(DB_FILE, JSON.stringify(links, null, 2));
+};
+
+// ==========================================
+// 1. API: Listar todos (Máximo 200, mais recentes primeiro)
+// ==========================================
+app.get('/api/all', (req, res) => {
+    const links = loadLinks();
+    
+    // Ordena por data (decrescente/mais novo pro mais velho)
+    const sortedLinks = links.sort((a, b) => new Date(b.date) - new Date(a.date));
+    
+    // Pega apenas os 200 primeiros
+    const top200 = sortedLinks.slice(0, 200);
+    
+    res.json(top200);
 });
 
-// =======================================================
-// ROTA DA API: Processa no backend e retorna JSON legítimo
-// =======================================================
-app.get('/api/all', async (req, res) => {
-    try {
-        // Busca a lista de arquivos diretamente pelo servidor
-        const response = await fetch(`https://archive.org/metadata/${IA_IDENTIFIER}?t=${Date.now()}`);
+// ==========================================
+// 2. API: Adicionar um Link
+// ==========================================
+app.post('/api/add', (req, res) => {
+    const { url, name, password } = req.body;
 
-        if (!response.ok) {
-            throw new Error("Falha ao buscar metadados no Internet Archive.");
-        }
+    // Verifica a senha do ENV
+    if (password !== PASSWORD) {
+        return res.status(401).json({ error: "Acesso Negado: Senha incorreta" });
+    }
+    if (!url || !name) {
+        return res.status(400).json({ error: "Você precisa enviar a 'url' e o 'name'" });
+    }
 
-        const data = await response.json();
-        const files = data.files || [];
+    let links = loadLinks();
 
-        // 1. Filtra para pegar apenas os arquivos .enc
-        let arquivosFiltrados = files.filter(f => f.name.endsWith('.enc'));
+    // Se já existir um link com esse nome, remove para substituir
+    links = links.filter(l => l.name !== name);
 
-        // 2. Ordena pela data de modificação (mtime), do mais RECENTE para o mais antigo
-        arquivosFiltrados.sort((a, b) => parseInt(b.mtime) - parseInt(a.mtime));
+    const newLink = {
+        id: Date.now().toString(), // ID único baseado no tempo
+        name: name,
+        url: url,
+        date: new Date().toISOString() // Salva a data atual
+    };
 
-        // 3. Corta a lista para pegar apenas os 200 primeiros
-        const top200 = arquivosFiltrados.slice(0, 200);
+    links.push(newLink);
+    saveLinks(links);
 
-        // 4. Formata a saída dos metadados
-        const resultadoLimpo = top200.map(arquivo => {
-            const dataLegivel = new Date(parseInt(arquivo.mtime) * 1000).toLocaleString('pt-BR');
-            return {
-                id: arquivo.name.replace('.enc', ''),
-                                          arquivo_completo: arquivo.name,
-                                          tamanho: arquivo.size + " bytes",
-                                          data_atualizacao: dataLegivel
-            };
-        });
+    res.json({ message: "Link salvo com sucesso!", link: newLink });
+});
 
-        // Cria a estrutura do JSON final
-        const respostaFinal = {
-            sucesso: true,
-            total_mostrado: resultadoLimpo.length,
-            arquivos: resultadoLimpo
-        };
+// ==========================================
+// 3. API: Remover um Link
+// ==========================================
+app.post('/api/remove', (req, res) => {
+    const { name, password } = req.body;
 
-        // Envia como JSON nativo (com o Content-Type: application/json)
-        res.json(respostaFinal);
+    if (password !== PASSWORD) {
+        return res.status(401).json({ error: "Acesso Negado: Senha incorreta" });
+    }
 
-    } catch (error) {
-        // Em caso de erro, envia o erro formatado em JSON com o status HTTP 500
-        res.status(500).json({
-            sucesso: false,
-            erro: "Ocorreu um erro ao buscar os arquivos no servidor.",
-            detalhe: error.message
-        });
+    let links = loadLinks();
+    const tamanhoOriginal = links.length;
+    
+    links = links.filter(l => l.name !== name);
+    saveLinks(links);
+
+    if (links.length < tamanhoOriginal) {
+        res.json({ message: `Link /${name} deletado com sucesso!` });
+    } else {
+        res.status(404).json({ error: "Link não encontrado!" });
     }
 });
 
-// Qualquer outra rota (incluindo a raiz '/') vai redirecionar automaticamente para a API
-app.get('*', (req, res) => {
-    res.redirect('/api/all');
+// ==========================================
+// 4. Redirecionamento Final (meu-site.com/onome)
+// ==========================================
+app.get('/:name', (req, res) => {
+    const links = loadLinks();
+    const linkBuscado = links.find(l => l.name === req.params.name);
+
+    if (linkBuscado) {
+        // Manda o usuário para a URL original
+        res.redirect(linkBuscado.url);
+    } else {
+        res.status(404).send("Link não encontrado.");
+    }
 });
 
+// Inicia o servidor
 app.listen(PORT, () => {
-    console.log(`Servidor Fenixflix rodando na porta ${PORT}`);
+    console.log(`Sistema rodando na porta ${PORT}`);
 });

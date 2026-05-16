@@ -3,160 +3,97 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Fenixflix API</title>
+    <title>Meu Encurtador de Links</title>
     <style>
-        /* Estilos apenas para a lista principal */
-        body {
-            background-color: #0d1117;
-            color: #c9d1d9;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
-            margin: 0;
-            padding: 20px;
-        }
-        .container { max-width: 800px; margin: 0 auto; }
-        h2 { border-bottom: 1px solid #30363d; padding-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
-        .btn-limpar-senha { background: #da3633; color: white; border: none; padding: 5px 10px; border-radius: 5px; cursor: pointer; font-size: 12px; }
-        .file-list-item { background: #161b22; border: 1px solid #30363d; padding: 15px; border-radius: 6px; margin-bottom: 10px; }
-        .file-list-item h3 { margin: 0; font-size: 16px; }
-        .file-list-item a { color: #58a6ff; text-decoration: none; }
-        .file-list-item p { margin: 5px 0 0; font-size: 12px; color: #8b949e; }
-        .loading { color: #8b949e; }
+        body { font-family: Arial, sans-serif; margin: 40px; max-width: 600px; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; font-weight: bold; margin-bottom: 5px; }
+        input { width: 100%; padding: 8px; box-sizing: border-box; }
+        button { padding: 10px 15px; background: #007bff; color: white; border: none; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        .links-list { margin-top: 30px; }
+        .link-item { background: #f4f4f4; padding: 10px; margin-bottom: 10px; border-radius: 5px; }
     </style>
 </head>
 <body>
 
-    <div id="ui-layout" class="container">
-        <h2>
-            Arquivos Fenix JSON
-            <button class="btn-limpar-senha" onclick="limparSenha()">Sair / Limpar Senha</button>
-        </h2>
-        <p id="statusText" class="loading">Iniciando sistema...</p>
-        <div id="resultadosContainer"></div>
+    <h2>🔗 Adicionar Novo Link</h2>
+    
+    <div class="form-group">
+        <label>Nome Curto (ex: filme1):</label>
+        <input type="text" id="linkName" placeholder="Digite o nome curto">
+    </div>
+    <div class="form-group">
+        <label>URL Original (Link longo):</label>
+        <input type="text" id="linkUrl" placeholder="https://...">
+    </div>
+    <div class="form-group">
+        <label>Senha do Admin:</label>
+        <input type="password" id="linkPassword" placeholder="Sua senha secreta">
+    </div>
+    <button onclick="adicionarLink()">Salvar Link</button>
+
+    <div class="links-list">
+        <h2>Últimos Links Adicionados</h2>
+        <button onclick="carregarLinks()" style="margin-bottom: 15px; background: #28a745;">🔄 Atualizar Lista</button>
+        <div id="listaDeLinks"></div>
     </div>
 
     <script>
-        const IA_IDENTIFIER = 'fenix-json'; 
-        const IA_METADATA_URL = `https://archive.org/metadata/${IA_IDENTIFIER}`;
-        const IA_DOWNLOAD_BASE = `https://archive.org/cors/${IA_IDENTIFIER}/`;
+        // Função para Adicionar Link
+        async function adicionarLink() {
+            const name = document.getElementById('linkName').value;
+            const url = document.getElementById('linkUrl').value;
+            const password = document.getElementById('linkPassword').value;
 
-        let CHAVE_FIXA = ""; 
-        let SENHA = "";
-
-        async function carregarConfiguracao() {
-            try {
-                const response = await fetch('api/config');
-                if (response.ok) {
-                    const config = await response.json();
-                    CHAVE_FIXA = config.CHAVE_FIXA || "";
-                }
-            } catch (e) { console.log("Config não encontrada."); }
-        }
-
-        function solicitarSenha() {
-            if (CHAVE_FIXA) { SENHA = CHAVE_FIXA; return; }
-            SENHA = sessionStorage.getItem('fenix_key');
-            if (!SENHA) {
-                SENHA = prompt("🔒 Digite a KEY de criptografia:");
-                if (SENHA) { sessionStorage.setItem('fenix_key', SENHA); } 
-                else { location.reload(); }
-            }
-        }
-
-        function limparSenha() {
-            sessionStorage.removeItem('fenix_key');
-            window.location.href = window.location.pathname;
-        }
-
-        // Sua lógica de descriptografia mantida
-        function xorDecryptFromHex(hexText, keyStr) {
-            try {
-                const encryptedBytes = new Uint8Array(hexText.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
-                const encoder = new TextEncoder();
-                const keyBytes = encoder.encode(keyStr);
-                const decryptedBytes = new Uint8Array(encryptedBytes.length);
-                for (let i = 0; i < encryptedBytes.length; i++) {
-                    decryptedBytes[i] = encryptedBytes[i] ^ keyBytes[i % keyBytes.length];
-                }
-                return new TextDecoder('utf-8').decode(decryptedBytes);
-            } catch (e) { return hexText; }
-        }
-
-        async function iniciarSistema() {
-            await carregarConfiguracao();
-            solicitarSenha();
-
-            const urlParams = new URLSearchParams(window.location.search);
-            const arquivoEspecifico = urlParams.get('file');
-
-            if (arquivoEspecifico) {
-                // MODO JSON PURO: Remove toda a interface antes de processar
-                document.getElementById('ui-layout').remove();
-                await exibirApenasJSON(arquivoEspecifico);
+            if (!name || !url || !password) {
+                alert("Preencha todos os campos!");
                 return;
             }
 
-            // MODO LISTA: Carrega interface normal
-            carregarListaArquivos();
-        }
+            const response = await fetch('/api/add', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, url, password })
+            });
 
-        async function exibirApenasJSON(id) {
-            try {
-                const nomeComEnc = id.endsWith('.enc') ? id : id + '.enc';
-                const response = await fetch(IA_DOWNLOAD_BASE + nomeComEnc);
-                if (!response.ok) throw new Error("Não encontrado");
+            const data = await response.json();
 
-                const jsonObj = await response.json();
-
-                // Processa descriptografia dos links nos streams
-                if (jsonObj.streams) {
-                    const processar = (s) => { if (s.url) s.url = xorDecryptFromHex(s.url, SENHA); };
-                    if (Array.isArray(jsonObj.streams)) {
-                        jsonObj.streams.forEach(processar);
-                    } else {
-                        for (const s in jsonObj.streams) 
-                            for (const e in jsonObj.streams[s]) 
-                                jsonObj.streams[s][e].forEach(processar);
-                    }
-                }
-
-                // LIMPEZA TOTAL E EXIBIÇÃO DO JSON
-                document.body.innerHTML = ""; 
-                document.body.style.margin = "0";
-                document.body.style.padding = "20px";
-                document.body.style.backgroundColor = "#0d1117";
-                document.body.style.color = "#7ee787"; // Cor verde estilo terminal
-                document.body.style.fontFamily = "'Courier New', monospace";
-                document.body.style.whiteSpace = "pre";
-                
-                // Exibe o JSON formatado como texto puro
-                document.body.innerText = JSON.stringify(jsonObj, null, 4);
-
-            } catch (e) {
-                document.body.innerHTML = `<pre style="color:red">Erro: ${e.message}</pre>`;
+            if (response.ok) {
+                alert("Link adicionado com sucesso!");
+                carregarLinks(); // Recarrega a lista
+            } else {
+                alert("Erro: " + data.error);
             }
         }
 
-        async function carregarListaArquivos() {
-            const statusText = document.getElementById('statusText');
-            const container = document.getElementById('resultadosContainer');
-            try {
-                const response = await fetch(IA_METADATA_URL + '?t=' + Date.now());
-                const data = await response.json();
-                const arquivos = data.files.filter(f => f.name.endsWith('.enc'));
-                
-                statusText.textContent = `${arquivos.length} arquivos encontrados.`;
-                
-                arquivos.forEach(f => {
-                    const nome = f.name.replace('.enc', '');
-                    const div = document.createElement('div');
-                    div.className = 'file-list-item';
-                    div.innerHTML = `<h3><a href="?file=${nome}">📄 ${nome}</a></h3><p>Modificado: ${new Date(parseInt(f.mtime)*1000).toLocaleString()}</p>`;
-                    container.appendChild(div);
-                });
-            } catch (e) { statusText.textContent = "Erro ao carregar lista."; }
+        // Função para Carregar a Lista de Links
+        async function carregarLinks() {
+            const response = await fetch('/api/all');
+            const links = await response.json();
+            const divLista = document.getElementById('listaDeLinks');
+            
+            divLista.innerHTML = ''; // Limpa a lista atual
+
+            if (links.length === 0) {
+                divLista.innerHTML = '<p>Nenhum link cadastrado ainda.</p>';
+                return;
+            }
+
+            links.forEach(link => {
+                const linkEncurtado = window.location.origin + '/' + link.name;
+                divLista.innerHTML += `
+                    <div class="link-item">
+                        <strong>Nome:</strong> ${link.name} <br>
+                        <strong>Link Curto:</strong> <a href="${linkEncurtado}" target="_blank">${linkEncurtado}</a> <br>
+                        <strong>Destino:</strong> <span style="word-break: break-all; font-size: 0.9em; color: #555;">${link.url}</span>
+                    </div>
+                `;
+            });
         }
 
-        iniciarSistema();
+        // Carrega a lista automaticamente quando a página abre
+        carregarLinks();
     </script>
 </body>
 </html>
