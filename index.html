@@ -118,13 +118,36 @@
         const IA_METADATA_URL = `https://archive.org/metadata/${IA_IDENTIFIER}`;
         const IA_DOWNLOAD_BASE = `https://archive.org/cors/${IA_IDENTIFIER}/`;
 
+        let CHAVE_FIXA = ""; 
         let SENHA = "";
 
         // ==========================================
-        // GERENCIAMENTO DE SENHA (Substitui o .env)
+        // CARREGAR CONFIGURAÇÃO GERADA PELO RENDER
+        // ==========================================
+        async function carregarConfiguracao() {
+            try {
+                // Tenta ler o arquivo que o Render criou durante o comando de Build
+                const response = await fetch('config.json');
+                if (response.ok) {
+                    const config = await response.json();
+                    CHAVE_FIXA = config.CHAVE_FIXA || "";
+                }
+            } catch (e) {
+                console.log("Arquivo config.json não encontrado. Usando fallback de senha.");
+            }
+        }
+
+        // ==========================================
+        // GERENCIAMENTO DE SENHA
         // ==========================================
         function solicitarSenha() {
+            if (CHAVE_FIXA) {
+                SENHA = CHAVE_FIXA;
+                return;
+            }
+
             SENHA = sessionStorage.getItem('fenix_key');
+
             if (!SENHA) {
                 SENHA = prompt("🔒 Digite a KEY de criptografia para visualizar os links:");
                 if (SENHA) {
@@ -139,7 +162,7 @@
 
         function limparSenha() {
             sessionStorage.removeItem('fenix_key');
-            window.location.href = window.location.pathname; // Recarrega a página limpando a URL
+            window.location.href = window.location.pathname;
         }
 
         // ==========================================
@@ -159,7 +182,7 @@
                 const decoder = new TextDecoder('utf-8');
                 return decoder.decode(decryptedBytes);
             } catch (e) {
-                return hexText; // Se falhar, retorna o texto original
+                return hexText;
             }
         }
 
@@ -167,10 +190,12 @@
         // FUNÇÃO DE INICIALIZAÇÃO
         // ==========================================
         async function iniciarSistema() {
+            await carregarConfiguracao();
+
             try {
-                solicitarSenha(); // Pede ou resgata a senha invisível
+                solicitarSenha();
             } catch (e) {
-                return; // Para tudo se o usuário cancelar a senha
+                return;
             }
 
             const statusText = document.getElementById('statusText');
@@ -179,10 +204,8 @@
             const urlParams = new URLSearchParams(window.location.search);
             const arquivoEspecifico = urlParams.get('file');
 
-            // --- MODO 1: ARQUIVO ESPECÍFICO (Mostra o JSON descriptografado) ---
             if (arquivoEspecifico) {
                 statusText.textContent = `Buscando e lendo: ${arquivoEspecifico}...`;
-                
                 resultadosContainer.innerHTML = '<a href="?" class="btn-voltar">⬅ Voltar para a lista</a>';
                 
                 const nomeComEnc = arquivoEspecifico.endsWith('.enc') ? arquivoEspecifico : arquivoEspecifico + '.enc';
@@ -193,7 +216,6 @@
                 return;
             }
 
-            // --- MODO 2: LISTA NORMAL ---
             try {
                 statusText.textContent = "Buscando lista de arquivos no Internet Archive...";
                 
@@ -243,7 +265,6 @@
 
                 const jsonObj = await response.json();
 
-                // Navega pelo JSON e descriptografa apenas as URLs
                 if (jsonObj.streams) {
                     if (Array.isArray(jsonObj.streams)) {
                         jsonObj.streams.forEach(stream => {
@@ -280,7 +301,6 @@
             }
         }
 
-        // Inicia o sistema
         iniciarSistema();
     </script>
 </body>
