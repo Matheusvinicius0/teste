@@ -15,12 +15,6 @@ import (
 
 var db *sql.DB
 
-// Estrutura para a rota de listagem
-type ResumoArquivo struct {
-	Nome        string    `json:"nome"`
-	DataCriacao time.Time `json:"data_criacao"`
-}
-
 func initDB() {
 	connStr := os.Getenv("DATABASE_URL")
 	if connStr == "" {
@@ -64,6 +58,7 @@ func main() {
 	// Rotas da API
 	mux.HandleFunc("/upload", uploadHandler)
 	mux.HandleFunc("/api/all", listAllHandler)
+	mux.HandleFunc("/api/catalog", listAllHandler) // Rota correta que o index.html tenta aceder
 	mux.HandleFunc("/count", countHandler)
 	mux.HandleFunc("/ping", pingHandler) // Nova rota para testar a ligação
 	
@@ -151,26 +146,29 @@ func listAllHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rows, err := db.Query("SELECT nome, data_criacao FROM arquivos_json ORDER BY data_criacao DESC")
+	// Agora pedimos o 'conteudo' (JSON completo) em vez do nome, para que 
+	// o frontend saiba distinguir se é filme/série e mostrar o catálogo corretamente.
+	rows, err := db.Query("SELECT conteudo FROM arquivos_json ORDER BY data_criacao DESC")
 	if err != nil {
-		http.Error(w, `{"erro": "Falha ao buscar arquivos"}`, http.StatusInternalServerError)
+		http.Error(w, `[{"erro": "Falha ao buscar arquivos"}]`, http.StatusInternalServerError)
 		return
 	}
 	defer rows.Close()
 
-	var arquivos []ResumoArquivo
+	// Constrói um array JSON nativo super rápido
+	w.Write([]byte("["))
+	first := true
 	for rows.Next() {
-		var a ResumoArquivo
-		if err := rows.Scan(&a.Nome, &a.DataCriacao); err == nil {
-			arquivos = append(arquivos, a)
+		var conteudo string
+		if err := rows.Scan(&conteudo); err == nil {
+			if !first {
+				w.Write([]byte(","))
+			}
+			w.Write([]byte(conteudo))
+			first = false
 		}
 	}
-
-	if arquivos == nil {
-		arquivos = []ResumoArquivo{}
-	}
-
-	json.NewEncoder(w).Encode(arquivos)
+	w.Write([]byte("]"))
 }
 
 // 3. Rota do Contador
