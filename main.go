@@ -23,7 +23,7 @@ const (
 var (
 	db            *sql.DB
 	tmdbCache     sync.Map
-	cinemetaCache sync.Map // Novo cache para não sobrecarregar o Cinemeta
+	cinemetaCache sync.Map // Cache para não sobrecarregar o Cinemeta
 	httpClient    = &http.Client{Timeout: 10 * time.Second}
 )
 
@@ -153,6 +153,7 @@ func main() {
 	mux.HandleFunc("/upload", uploadHandler)
 	mux.HandleFunc("/api/all", listAllHandler)
 	mux.HandleFunc("/api/catalog", listAllHandler)
+	mux.HandleFunc("/api/delete", deleteHandler) // Nova rota de apagar ficheiros
 	mux.HandleFunc("/count", countHandler)
 	mux.HandleFunc("/ping", pingHandler)
 	
@@ -219,7 +220,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 		var data map[string]interface{}
 		if err := json.Unmarshal([]byte(conteudo), &data); err == nil {
 			
-			// 1. Busca dados no TMDB (Mais rápido para obter Título, Ano e Tipo base)
+			// 1. Busca dados no TMDB
 			info := getTMDBInfo(nome, httpClient)
 			if info.Title != "" {
 				data["title"] = info.Title
@@ -229,7 +230,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 			
-			// Determina o tipo (movie ou series) para buscar corretamente no Cinemeta
+			// Determina o tipo (movie ou series)
 			cType := "movie"
 			if t, ok := data["type"].(string); ok && t != "" {
 				cType = t
@@ -238,15 +239,12 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 			// 2. Busca dados no Cinemeta (Stremio)
 			cinemeta := getCinemetaInfo(nome, cType, httpClient)
 			if cinemeta != nil {
-				// Injeta a lista de vídeos (episódios oficiais) para o Catálogo contar os faltantes
 				if videos, ok := cinemeta["videos"]; ok {
 					data["cinemetaVideos"] = videos
 				}
-				// Injeta a descrição oficial (sinopse)
 				if desc, ok := cinemeta["description"]; ok && data["description"] == nil {
 					data["description"] = desc
 				}
-				// Injeta o background (imagem de fundo)
 				if bg, ok := cinemeta["background"]; ok && data["background"] == nil {
 					data["background"] = bg
 				}
@@ -262,7 +260,6 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 				data["id"] = nome
 			}
 
-			// Converte de volta para string para gravar no banco de dados
 			if enrichedBytes, err := json.Marshal(data); err == nil {
 				conteudo = string(enrichedBytes)
 			}
@@ -285,7 +282,55 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(fmt.Sprintf(`{"sucesso": true, "mensagem": "'%s' salvo com sucesso no banco de dados!"}`, nome)))
 }
 
-// 2. Rota para listar todos (Catálogo)
+// 2. Rota para apagar (Protegida)
+func deleteHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	
+	if db == nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(`{"erro": "Servidor offline"}`))
+		return
+	}
+
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		w.Write([]byte(`{"erro": "Método não permitido"}`))
+		return
+	}
+
+	var reqData struct {
+		ID    string `json:"id"`
+		Senha string `json:"senha"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&reqData); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte(`{"erro": "Dados inválidos"}`))
+		return
+	}
+
+	adminPassword := os.Getenv("ADMIN_PASSWORD")
+	if adminPassword == "" {
+		adminPassword = "sua_senha_padrao_aqui"
+	}
+
+	if reqData.Senha != adminPassword {
+		w.WriteHeader(http.StatusForbidden)
+		w.Write([]byte(`{"erro": "Acesso negado: Senha incorreta"}`))
+		return
+	}
+
+	_, err := db.Exec("DELETE FROM arquivos_json WHERE nome = $1", reqData.ID)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(fmt.Sprintf(`{"erro": "%s"}`, err.Error())))
+		return
+	}
+
+	w.Write([]byte(`{"sucesso": true}`))
+}
+
+// 3. Rota para listar todos (Catálogo)
 func listAllHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -316,7 +361,7 @@ func listAllHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("]"))
 }
 
-// 3. Rota do Contador
+// 4. Rota do Contador
 func countHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -335,7 +380,7 @@ func countHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(fmt.Sprintf(`{"total_jsons": %d}`, total)))
 }
 
-// 4. Rota Dinâmica (Serve o index.html OU o JSON)
+// 5. Rota Dinâmica (Serve o index.html OU o JSON)
 func rootHandler(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Path
 
@@ -370,7 +415,7 @@ func rootHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(conteudo))
 }
 
-// 5. Rota de Teste de Conexão
+// 6. Rota de Teste de Conexão
 func pingHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	
