@@ -17,6 +17,7 @@ import (
 // ==== CONSTANTES TMDB E RPDB ====
 const (
 	RPDBBaseURL = "https://api.ratingposterdb.com/t0-free-rpdb"
+	// Esta chave longa é um Bearer Token, precisa ser enviada no Header de Autorização
 	TMDBAPIKey  = "eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJlZTBmMzJmNzY5Mzc0YTkzYTI0ZmNiYzcyMWRlODYzNCIsIm5iZiI6MTc1NjA2MzM2NC4yMzksInN1YiI6IjY4YWI2Njg0ZDAyMjdhYTVlMjlkYjE2MSIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.z1hG61Z5RCvn6qEZj60sHxrDZ0hR8QQi4rt18erzF-w"
 )
 
@@ -50,10 +51,15 @@ func getTMDBInfo(id string, client *http.Client) TMDBData {
 	if cached, ok := tmdbCache.Load(id); ok {
 		return cached.(TMDBData)
 	}
-	url := fmt.Sprintf("https://api.themoviedb.org/3/find/%s?api_key=%s&external_source=imdb_id&language=pt-BR", id, TMDBAPIKey)
+	
+	// CORREÇÃO: Removido o api_key do URL. O token será enviado no Header.
+	url := fmt.Sprintf("https://api.themoviedb.org/3/find/%s?external_source=imdb_id&language=pt-BR", id)
 	
 	req, _ := http.NewRequest("GET", url, nil)
 	req.Header.Set("User-Agent", "Mozilla/5.0")
+	req.Header.Set("Accept", "application/json")
+	// CORREÇÃO: Enviar a chave como Authorization Bearer
+	req.Header.Set("Authorization", "Bearer "+TMDBAPIKey)
 	
 	resp, err := client.Do(req)
 	if err != nil || resp.StatusCode != 200 {
@@ -153,7 +159,7 @@ func main() {
 	mux.HandleFunc("/upload", uploadHandler)
 	mux.HandleFunc("/api/all", listAllHandler)
 	mux.HandleFunc("/api/catalog", listAllHandler)
-	mux.HandleFunc("/api/delete", deleteHandler) // Nova rota de apagar ficheiros
+	mux.HandleFunc("/api/delete", deleteHandler) // Rota de apagar ficheiros
 	mux.HandleFunc("/count", countHandler)
 	mux.HandleFunc("/ping", pingHandler)
 	
@@ -220,7 +226,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 		var data map[string]interface{}
 		if err := json.Unmarshal([]byte(conteudo), &data); err == nil {
 			
-			// 1. Busca dados no TMDB
+			// 1. Busca dados no TMDB (Agora a funcionar perfeitamente com Auth)
 			info := getTMDBInfo(nome, httpClient)
 			if info.Title != "" {
 				data["title"] = info.Title
