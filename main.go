@@ -17,7 +17,7 @@ import (
 // ==== CONSTANTES TMDB E RPDB ====
 const (
 	RPDBBaseURL = "https://api.ratingposterdb.com/t0-free-rpdb"
-	// Esta chave longa é um Bearer Token, precisa ser enviada no Header de Autorização
+	// Token Bearer do TMDB
 	TMDBAPIKey  = "eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJlZTBmMzJmNzY5Mzc0YTkzYTI0ZmNiYzcyMWRlODYzNCIsIm5iZiI6MTc1NjA2MzM2NC4yMzksInN1YiI6IjY4YWI2Njg0ZDAyMjdhYTVlMjlkYjE2MSIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.z1hG61Z5RCvn6qEZj60sHxrDZ0hR8QQi4rt18erzF-w"
 )
 
@@ -52,20 +52,24 @@ func getTMDBInfo(id string, client *http.Client) TMDBData {
 		return cached.(TMDBData)
 	}
 	
-	// CORREÇÃO: Removido o api_key do URL. O token será enviado no Header.
 	url := fmt.Sprintf("https://api.themoviedb.org/3/find/%s?external_source=imdb_id&language=pt-BR", id)
 	
 	req, _ := http.NewRequest("GET", url, nil)
 	req.Header.Set("User-Agent", "Mozilla/5.0")
 	req.Header.Set("Accept", "application/json")
-	// CORREÇÃO: Enviar a chave como Authorization Bearer
 	req.Header.Set("Authorization", "Bearer "+TMDBAPIKey)
 	
 	resp, err := client.Do(req)
-	if err != nil || resp.StatusCode != 200 {
+	if err != nil {
+		log.Printf("❌ Erro de rede ao contactar TMDB para o ID %s: %v", id, err)
 		return TMDBData{}
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		log.Printf("⚠️ TMDB recusou o pedido para o ID %s. Código de erro: %d (Verifique se a chave TMDB está correta)", id, resp.StatusCode)
+		return TMDBData{}
+	}
 
 	var tmdb TMDBFindResponse
 	data := TMDBData{Type: "movie"}
@@ -76,14 +80,21 @@ func getTMDBInfo(id string, client *http.Client) TMDBData {
 			if len(tmdb.MovieResults[0].ReleaseDate) >= 4 {
 				data.Year = tmdb.MovieResults[0].ReleaseDate[:4]
 			}
+			log.Printf("✅ TMDB encontrou Filme: %s", data.Title)
 		} else if len(tmdb.TvResults) > 0 {
 			data.Title = tmdb.TvResults[0].Name
 			data.Type = "series"
 			if len(tmdb.TvResults[0].FirstAirDate) >= 4 {
 				data.Year = tmdb.TvResults[0].FirstAirDate[:4]
 			}
+			log.Printf("✅ TMDB encontrou Série: %s", data.Title)
+		} else {
+			log.Printf("⚠️ TMDB respondeu com sucesso, mas não encontrou o ID %s", id)
 		}
+	} else {
+		log.Printf("❌ Erro ao ler resposta do TMDB para o ID %s: %v", id, err)
 	}
+
 	if data.Title != "" {
 		tmdbCache.Store(id, data)
 	}
@@ -159,7 +170,7 @@ func main() {
 	mux.HandleFunc("/upload", uploadHandler)
 	mux.HandleFunc("/api/all", listAllHandler)
 	mux.HandleFunc("/api/catalog", listAllHandler)
-	mux.HandleFunc("/api/delete", deleteHandler) // Rota de apagar ficheiros
+	mux.HandleFunc("/api/delete", deleteHandler) 
 	mux.HandleFunc("/count", countHandler)
 	mux.HandleFunc("/ping", pingHandler)
 	
@@ -182,7 +193,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	
 	if db == nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(`{"erro": "Servidor sem conexão com o banco de dados. Configure a DATABASE_URL."}`))
+		w.Write([]byte(`{"erro": "Servidor sem conexão com o banco de dados."}`))
 		return
 	}
 
@@ -220,14 +231,25 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// =========================================================================
-	// MAGIA TMDB/CINEMETA/RPDB: Interceptar o JSON e injetar dados
+	// MAGIA TMDB/CINEMETA/RPDB: Agora lê o ID por dentro do JSON!
 	// =========================================================================
-	if strings.HasPrefix(nome, "tt") {
-		var data map[string]interface{}
-		if err := json.Unmarshal([]byte(conteudo), &data); err == nil {
-			
-			// 1. Busca dados no TMDB (Agora a funcionar perfeitamente com Auth)
-			info := getTMDBInfo(nome, httpClient)
+	var data map[string]interface{}
+	if err := json.Unmarshal([]byte(conteudo), &data); err == nil {
+		
+		imdbID := ""
+		
+		// 1. Procura o ID dentro do próprio JSON (Onde o editor sempre coloca o 'tt')
+		if idVal, ok := data["id"].(string); ok && strings.HasPrefix(idVal, "tt") {
+			imdbID = idVal
+		} else if strings.HasPrefix(nome, "tt") {
+			// Fallback: tenta ver pelo nome do arquivo
+			imdbID = nome
+		}
+
+		// 2. Se achamos um IMDb ID válido, processa os metadados
+		if imdbID != "" {
+			// Busca dados no TMDB
+			info := getTMDBInfo(imdbID, httpClient)
 			if info.Title != "" {
 				data["title"] = info.Title
 				data["year"] = info.Year
@@ -242,8 +264,8 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 				cType = t
 			}
 
-			// 2. Busca dados no Cinemeta (Stremio)
-			cinemeta := getCinemetaInfo(nome, cType, httpClient)
+			// Busca dados no Cinemeta (Stremio)
+			cinemeta := getCinemetaInfo(imdbID, cType, httpClient)
 			if cinemeta != nil {
 				if videos, ok := cinemeta["videos"]; ok {
 					data["cinemetaVideos"] = videos
@@ -256,19 +278,20 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 			
-			// 3. Injeta a capa do RPDB baseada no ID do IMDb
+			// Injeta a capa do RPDB
 			if data["poster"] == nil {
-				data["poster"] = fmt.Sprintf("%s/imdb/poster-default/%s.jpg", RPDBBaseURL, nome)
+				data["poster"] = fmt.Sprintf("%s/imdb/poster-default/%s.jpg", RPDBBaseURL, imdbID)
 			}
 			
-			// Garante que o ID está presente no JSON
+			// Garante que o ID está presente
 			if _, exists := data["id"]; !exists {
-				data["id"] = nome
+				data["id"] = imdbID
 			}
+		}
 
-			if enrichedBytes, err := json.Marshal(data); err == nil {
-				conteudo = string(enrichedBytes)
-			}
+		// Reconstroi a string JSON sempre (mesmo se falhar o enriquecimento, preserva o JSON limpo)
+		if enrichedBytes, err := json.Marshal(data); err == nil {
+			conteudo = string(enrichedBytes)
 		}
 	}
 	// =========================================================================
