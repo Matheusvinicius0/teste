@@ -219,7 +219,6 @@
                                 <button onclick="gen.download()" class="bg-white hover:bg-zinc-200 text-zinc-950 p-2 rounded-lg transition" title="Baixar Arquivo .json">
                                     <i class="fa-solid fa-download"></i>
                                 </button>
-                                <!-- NOVO BOTÃO DE UPLOAD PARA O BANCO DE DADOS -->
                                 <button onclick="gen.uploadParaBanco()" class="bg-indigo-600 hover:bg-indigo-500 text-white p-2 rounded-lg transition shadow-lg shadow-indigo-500/20" title="Salvar JSON no Banco">
                                     <i class="fa-solid fa-cloud-arrow-up"></i>
                                 </button>
@@ -279,13 +278,13 @@
                     <button onclick="cat.init()" class="bg-zinc-900 text-zinc-400 border border-zinc-800 hover:text-white px-4 py-2 rounded-xl text-xs font-medium whitespace-nowrap transition-colors flex items-center gap-2 mr-2">
                         <i class="fa-solid fa-rotate"></i> Atualizar
                     </button>
-                    
-                    <!-- NOVO BOTÃO DE UPLOAD EM LOTE AQUI -->
+
+                    <!-- Botão de Upload em Lote -->
                     <label class="cursor-pointer bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-xl text-xs font-medium whitespace-nowrap transition-colors flex items-center gap-2 mr-2 shadow-sm" title="Enviar vários ficheiros .json para o banco">
                         <i class="fa-solid fa-cloud-arrow-up"></i> Upload Lote
                         <input type="file" accept=".json" multiple class="hidden" onchange="cat.uploadEmMassa(this)">
                     </label>
-
+                    
                     <button onclick="cat.filter('all')" id="btn-all" class="filter-btn bg-white text-zinc-900 px-5 py-2 rounded-xl text-xs font-medium whitespace-nowrap transition-colors shadow-sm">Todos</button>
                     <button onclick="cat.filter('series')" id="btn-series" class="filter-btn bg-zinc-900 text-zinc-400 border border-zinc-800 hover:text-zinc-200 px-5 py-2 rounded-xl text-xs font-medium whitespace-nowrap transition-colors">Séries</button>
                     <button onclick="cat.filter('movie')" id="btn-movie" class="filter-btn bg-zinc-900 text-zinc-400 border border-zinc-800 hover:text-zinc-200 px-5 py-2 rounded-xl text-xs font-medium whitespace-nowrap transition-colors">Filmes</button>
@@ -406,7 +405,7 @@
             </div>
             <div id="modalContent" class="p-6 overflow-y-auto space-y-2 bg-zinc-950 flex-grow custom-scrollbar"></div>
             <div class="p-4 bg-zinc-900 border-t border-zinc-800 flex justify-between items-center text-[10px] font-medium text-zinc-500 uppercase tracking-wider">
-                <span>Clique num item para copiar o URL</span>
+                <span>Use o botão Editar para gerir</span>
                 <span id="modalTotalLinks">0 links</span>
             </div>
         </div>
@@ -687,7 +686,6 @@
                 showToast("Download iniciado");
             },
 
-            // --- NOVA FUNÇÃO: UPLOAD PARA O POSTGRESQL ---
             uploadParaBanco: async () => {
                 if (!gen.currentData) return showToast("Nenhum JSON para enviar!", "warning");
                 
@@ -949,7 +947,7 @@
 
                 gen.currentData = exportData;
                 document.getElementById('contentId').value = exportData.id;
-                document.getElementById('seriesName').value = item.title || '';
+                document.getElementById('seriesName').value = item.title || item.id || '';
                 
                 const typeRadio = document.querySelector(`input[name="contentType"][value="${exportData.type}"]`);
                 if(typeRadio) typeRadio.checked = true;
@@ -996,30 +994,37 @@
             },
 
             deleteItem: async (id) => {
-                if(!confirm(`Remover ${id}? \nIsso remove visualmente até o servidor atualizar.`)) return;
+                const senha = prompt(`Digite a senha do sistema para apagar o ficheiro ${id}:`);
+                if (!senha) return;
+                
+                if(!confirm(`Tem a certeza absoluta que quer apagar ${id}? Esta ação é irreversível.`)) return;
 
                 try {
-                    await fetch('/api/delete', {
+                    const response = await fetch('/api/delete', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ id: id })
+                        body: JSON.stringify({ id: id, senha: senha })
                     });
                     
-                    cat.allItems = cat.allItems.filter(i => i.id !== id);
+                    const data = await response.json();
                     
-                    const btnMissing = document.getElementById('btn-missing_all');
-                    const currentFilterIsMissing = btnMissing && btnMissing.classList.contains('bg-white');
-                    
-                    if (currentFilterIsMissing) cat.filter('missing_all');
-                    else cat.filter('all');
-                    
-                    cat.updateGlobalStats();
-                    showToast(`${id} removido!`, 'success');
-                } catch(e) { showToast('Erro', 'error'); }
+                    if(response.ok && data.sucesso) {
+                        cat.allItems = cat.allItems.filter(i => i.id !== id);
+                        
+                        const btnMissing = document.getElementById('btn-missing_all');
+                        if (btnMissing && btnMissing.classList.contains('bg-white')) cat.filter('missing_all');
+                        else cat.filter('all');
+                        
+                        cat.updateGlobalStats();
+                        showToast(`${id} removido!`, 'success');
+                    } else {
+                        showToast(`Erro: ${data.erro}`, 'error');
+                    }
+                } catch(e) { showToast('Erro de conexão ao tentar apagar', 'error'); }
             },
 
             renderCard: (item) => {
-                const posterHtml = item.poster ? `<img src="${item.poster}" alt="${item.title}" loading="lazy" class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105 opacity-90 group-hover:opacity-100">` : `<div class="flex flex-col items-center justify-center h-full bg-zinc-900 text-zinc-700"><i class="fa-solid fa-image text-3xl mb-2"></i><span class="text-[10px]">${item.id}</span></div>`;
+                const posterHtml = item.poster ? `<img src="${item.poster}" alt="${item.title || item.id}" loading="lazy" class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105 opacity-90 group-hover:opacity-100">` : `<div class="flex flex-col items-center justify-center h-full bg-zinc-900 text-zinc-700"><i class="fa-solid fa-image text-3xl mb-2"></i><span class="text-[10px]">${item.id}</span></div>`;
 
                 let footerHtml = '';
                 if (item.type === 'series') {
@@ -1050,25 +1055,23 @@
                         ${posterHtml}
                     </div>
                     <div class="p-3.5 flex flex-col flex-grow bg-zinc-900" onclick="cat.openLinks('${item.id}')">
-                        <h3 class="font-medium text-zinc-200 leading-snug mb-1 line-clamp-2 text-xs" title="${item.title}">${item.title}</h3>
+                        <h3 class="font-medium text-zinc-200 leading-snug mb-1 line-clamp-2 text-xs" title="${item.title || item.id}">${item.title || item.id}</h3>
                         ${footerHtml}
                     </div>
                 </div>`;
             },
 
             filter: (type) => {
-                // Remove estilos ativos de todos
                 document.querySelectorAll('.filter-btn').forEach(b => {
                     b.classList.remove('bg-white', 'text-zinc-900', 'shadow-sm');
                     b.classList.add('bg-zinc-900', 'border-zinc-800');
                     if (b.id === 'btn-missing_all') {
-                        b.classList.add('text-amber-500'); // mantém laranjinha se inativo
+                        b.classList.add('text-amber-500'); 
                     } else {
                         b.classList.add('text-zinc-400');
                     }
                 });
 
-                // Adiciona o estilo ativo no selecionado
                 const activeBtn = document.getElementById(`btn-${type}`);
                 if(activeBtn) {
                     activeBtn.classList.remove('bg-zinc-900', 'text-zinc-400', 'text-amber-500');
@@ -1118,14 +1121,13 @@
                 else el.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Conectado`;
             },
 
-            // NOVA FUNÇÃO: UPLOAD EM LOTE DE JSONS
             uploadEmMassa: async (input) => {
                 const files = input.files;
                 if (!files || files.length === 0) return;
 
                 const senha = prompt(`Vai enviar ${files.length} ficheiro(s) JSON. Digite a senha do sistema:`);
                 if (!senha) {
-                    input.value = ""; // Limpa a seleção se cancelar
+                    input.value = ""; 
                     return;
                 }
 
@@ -1140,7 +1142,6 @@
                         const text = await file.text();
                         const json = JSON.parse(text);
 
-                        // Usa o nome do ficheiro (sem o .json) como nome no banco de dados
                         let nomeArquivo = file.name.replace('.json', '');
 
                         const formData = new FormData();
@@ -1164,10 +1165,9 @@
                     }
                 }
 
-                input.value = ""; // Limpa a seleção no final
+                input.value = ""; 
                 showToast(`Upload concluído! Sucesso: ${sucesso} | Erros: ${erro}`, erro > 0 ? 'warning' : 'success');
                 
-                // Atualiza o catálogo para mostrar os novos conteúdos enviados
                 cat.init();
             },
 
@@ -1206,34 +1206,15 @@
                 if (!item.streams || item.streams.length === 0) {
                     content.innerHTML = '<div class="text-zinc-600 text-center py-10 text-sm">Nenhum link encontrado.</div>';
                 } else {
-                    let displayStreams = [...item.streams];
-                    if(item.type === 'series') displayStreams.sort((a,b) => (a.name || "").localeCompare(b.name || "", undefined, {numeric: true, sensitivity: 'base'}));
-                    
-                    const gridLinks = document.createElement('div');
-                    gridLinks.className = "space-y-2";
-
-                    displayStreams.forEach(stream => {
-                        const name = stream.name || "Link"; const url = stream.url || "#";
-                        const epMatch = name.match(/S\d+E\d+|(\d+)x(\d+)/i);
-                        const highlight = epMatch ? `<span class="text-zinc-500 text-[10px] font-mono mr-3 uppercase">${epMatch[0]}</span>` : "";
-                        const linkEl = document.createElement('div');
-                        linkEl.className = "bg-zinc-900 hover:bg-zinc-800 p-3.5 rounded-xl border border-zinc-800 flex justify-between items-center transition-colors cursor-pointer group";
-                        linkEl.innerHTML = `<div class="flex items-center overflow-hidden"><div class="flex flex-col overflow-hidden"><div class="flex items-center">${highlight}<span class="text-xs font-medium text-zinc-300 truncate group-hover:text-white">${name.replace(epMatch ? epMatch[0] : '', '').trim() || name}</span></div></div></div><div class="text-zinc-600 group-hover:text-zinc-300 pl-4"><i class="fa-regular fa-copy text-sm"></i></div>`;
-                        linkEl.onclick = () => { 
-                            navigator.clipboard.writeText(url); 
-                            const icon = linkEl.querySelector('.fa-copy'); 
-                            icon.classList.replace('fa-copy', 'fa-check'); 
-                            icon.classList.add('text-emerald-400');
-                            setTimeout(() => { 
-                                icon.classList.replace('fa-check', 'fa-copy'); 
-                                icon.classList.remove('text-emerald-400');
-                            }, 1000); 
-                        };
-                        gridLinks.appendChild(linkEl);
-                    });
-                    content.appendChild(gridLinks);
+                    // SUBSTITUÍDO: Agora não renderiza os links! Mostra apenas uma mensagem informativa
+                    content.innerHTML = `
+                    <div class="flex flex-col items-center justify-center py-12 text-zinc-500">
+                        <i class="fa-solid fa-eye-slash text-3xl mb-3 opacity-50"></i>
+                        <p class="text-sm font-medium">Links Ocultos</p>
+                        <p class="text-xs text-zinc-600 mt-1 text-center max-w-xs">Para manter a interface limpa, os links não são exibidos aqui.<br>Feche esta janela e clique no ícone do Lápis (Editar) para os ver.</p>
+                    </div>`;
                 }
-                document.getElementById('modalTotalLinks').innerText = `${item.streams ? item.streams.length : 0} links`;
+                document.getElementById('modalTotalLinks').innerText = `Oculto`;
                 document.getElementById('linkModal').classList.remove('hidden');
             },
             closeModal: () => { document.getElementById('linkModal').classList.add('hidden'); }
