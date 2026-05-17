@@ -8,12 +8,82 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
+	"time"
 
 	_ "github.com/lib/pq"
 )
 
-var db *sql.DB
+// ==== CONSTANTES TMDB E RPDB ====
+const (
+	RPDBBaseURL = "https://api.ratingposterdb.com/t0-free-rpdb"
+	TMDBAPIKey  = "eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJlZTBmMzJmNzY5Mzc0YTkzYTI0ZmNiYzcyMWRlODYzNCIsIm5iZiI6MTc1NjA2MzM2NC4yMzksInN1YiI6IjY4YWI2Njg0ZDAyMjdhYTVlMjlkYjE2MSIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.z1hG61Z5RCvn6qEZj60sHxrDZ0hR8QQi4rt18erzF-w"
+)
 
+var (
+	db         *sql.DB
+	tmdbCache  sync.Map
+	httpClient = &http.Client{Timeout: 10 * time.Second}
+)
+
+// ==== ESTRUTURAS DO TMDB ====
+type TMDBFindResponse struct {
+	MovieResults []struct {
+		Title       string `json:"title"`
+		ReleaseDate string `json:"release_date"`
+	} `json:"movie_results"`
+	TvResults []struct {
+		Name         string `json:"name"`
+		FirstAirDate string `json:"first_air_date"`
+	} `json:"tv_results"`
+}
+
+type TMDBData struct {
+	Title string
+	Year  string
+	Type  string
+}
+
+// ==== FUNÇÃO DE BUSCA NO TMDB ====
+func getTMDBInfo(id string, client *http.Client) TMDBData {
+	if cached, ok := tmdbCache.Load(id); ok {
+		return cached.(TMDBData)
+	}
+	url := fmt.Sprintf("https://api.themoviedb.org/3/find/%s?api_key=%s&external_source=imdb_id&language=pt-BR", id, TMDBAPIKey)
+	
+	req, _ := http.NewRequest("GET", url, nil)
+	req.Header.Set("User-Agent", "Mozilla/5.0")
+	
+	resp, err := client.Do(req)
+	if err != nil || resp.StatusCode != 200 {
+		return TMDBData{}
+	}
+	defer resp.Body.Close()
+
+	var tmdb TMDBFindResponse
+	data := TMDBData{Type: "movie"}
+	if err := json.NewDecoder(resp.Body).Decode(&tmdb); err == nil {
+		if len(tmdb.MovieResults) > 0 {
+			data.Title = tmdb.MovieResults[0].Title
+			data.Type = "movie"
+			if len(tmdb.MovieResults[0].ReleaseDate) >= 4 {
+				data.Year = tmdb.MovieResults[0].ReleaseDate[:4]
+			}
+		} else if len(tmdb.TvResults) > 0 {
+			data.Title = tmdb.TvResults[0].Name
+			data.Type = "series"
+			if len(tmdb.TvResults[0].FirstAirDate) >= 4 {
+				data.Year = tmdb.TvResults[0].FirstAirDate[:4]
+			}
+		}
+	}
+	if data.Title != "" {
+		tmdbCache.Store(id, data)
+	}
+	return data
+}
+
+// ==== INICIALIZAÇÃO DO BANCO ====
 func initDB() {
 	connStr := os.Getenv("DATABASE_URL")
 	if connStr == "" {
@@ -27,13 +97,11 @@ func initDB() {
 		log.Fatalf("❌ Erro ao abrir conexão: %v", err)
 	}
 
-	// Testa se a comunicação com o banco realmente funciona
 	err = db.Ping()
 	if err != nil {
 		log.Fatalf("❌ Falha na comunicação com o PostgreSQL: %v", err)
 	}
 
-	// Cria a tabela caso não exista
 	query := `
 		CREATE TABLE IF NOT EXISTS arquivos_json (
 			id SERIAL PRIMARY KEY,
@@ -54,17 +122,14 @@ func main() {
 
 	mux := http.NewServeMux()
 
-	// Rotas da API
 	mux.HandleFunc("/upload", uploadHandler)
 	mux.HandleFunc("/api/all", listAllHandler)
-	mux.HandleFunc("/api/catalog", listAllHandler) // Rota correta que o index.html tenta aceder
+	mux.HandleFunc("/api/catalog", listAllHandler)
 	mux.HandleFunc("/count", countHandler)
-	mux.HandleFunc("/ping", pingHandler) // Nova rota para testar a ligação
+	mux.HandleFunc("/ping", pingHandler)
 	
-	// Rota Raiz (Serve o HTML ou busca o JSON pelo nome)
 	mux.HandleFunc("/", rootHandler)
 
-	// Middleware de CORS
 	handler := corsMiddleware(mux)
 
 	port := os.Getenv("PORT")
@@ -80,7 +145,6 @@ func main() {
 func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	
-	// Proteção contra crash se o banco estiver off
 	if db == nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(`{"erro": "Servidor sem conexão com o banco de dados. Configure a DATABASE_URL."}`))
@@ -99,7 +163,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 
 	adminPassword := os.Getenv("ADMIN_PASSWORD")
 	if adminPassword == "" {
-		adminPassword = "sua_senha_padrao_aqui" // Fallback
+		adminPassword = "sua_senha_padrao_aqui"
 	}
 
 	if senha != adminPassword {
@@ -120,6 +184,39 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// =========================================================================
+	// MAGIA TMDB/RPDB: Interceptar o JSON e injetar o Nome, Ano e Capa
+	// =========================================================================
+	if strings.HasPrefix(nome, "tt") {
+		var data map[string]interface{}
+		if err := json.Unmarshal([]byte(conteudo), &data); err == nil {
+			
+			// Busca dados no TMDB
+			info := getTMDBInfo(nome, httpClient)
+			if info.Title != "" {
+				data["title"] = info.Title
+				data["year"] = info.Year
+				if _, exists := data["type"]; !exists {
+					data["type"] = info.Type
+				}
+			}
+			
+			// Injeta a capa do RPDB baseada no ID do IMDb
+			data["poster"] = fmt.Sprintf("%s/imdb/poster-default/%s.jpg", RPDBBaseURL, nome)
+			
+			// Garante que o ID está presente no JSON
+			if _, exists := data["id"]; !exists {
+				data["id"] = nome
+			}
+
+			// Converte de volta para string para gravar no banco de dados
+			if enrichedBytes, err := json.Marshal(data); err == nil {
+				conteudo = string(enrichedBytes)
+			}
+		}
+	}
+	// =========================================================================
+
 	query := `
 		INSERT INTO arquivos_json (nome, conteudo) 
 		VALUES ($1, $2)
@@ -139,14 +236,11 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 func listAllHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	// Proteção contra crash
 	if db == nil {
 		http.Error(w, `[{"erro": "Banco de dados offline"}]`, http.StatusInternalServerError)
 		return
 	}
 
-	// Agora pedimos o 'conteudo' (JSON completo) em vez do nome, para que 
-	// o frontend saiba distinguir se é filme/série e mostrar o catálogo corretamente.
 	rows, err := db.Query("SELECT conteudo FROM arquivos_json ORDER BY data_criacao DESC")
 	if err != nil {
 		http.Error(w, `[{"erro": "Falha ao buscar arquivos"}]`, http.StatusInternalServerError)
@@ -154,7 +248,6 @@ func listAllHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer rows.Close()
 
-	// Constrói um array JSON nativo super rápido
 	w.Write([]byte("["))
 	first := true
 	for rows.Next() {
@@ -193,7 +286,6 @@ func countHandler(w http.ResponseWriter, r *http.Request) {
 func rootHandler(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Path
 
-	// Se acessou a raiz, retorna o frontend HTML
 	if path == "/" || path == "/index.html" {
 		http.ServeFile(w, r, "index.html")
 		return
@@ -201,7 +293,6 @@ func rootHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 
-	// Proteção contra crash ao tentar ler json
 	if db == nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(`{"erro": "Servidor offline ou sem banco de dados configurado"}`))
@@ -249,7 +340,8 @@ func pingHandler(w http.ResponseWriter, r *http.Request) {
 func corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+		// Opcão DELETE readicionada conforme o seu snippet anterior
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS, DELETE")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 		if r.Method == "OPTIONS" {
 			w.WriteHeader(http.StatusOK)
