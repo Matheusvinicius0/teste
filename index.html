@@ -280,6 +280,12 @@
                         <i class="fa-solid fa-rotate"></i> Atualizar
                     </button>
                     
+                    <!-- NOVO BOTÃO DE UPLOAD EM LOTE AQUI -->
+                    <label class="cursor-pointer bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-xl text-xs font-medium whitespace-nowrap transition-colors flex items-center gap-2 mr-2 shadow-sm" title="Enviar vários ficheiros .json para o banco">
+                        <i class="fa-solid fa-cloud-arrow-up"></i> Upload Lote
+                        <input type="file" accept=".json" multiple class="hidden" onchange="cat.uploadEmMassa(this)">
+                    </label>
+
                     <button onclick="cat.filter('all')" id="btn-all" class="filter-btn bg-white text-zinc-900 px-5 py-2 rounded-xl text-xs font-medium whitespace-nowrap transition-colors shadow-sm">Todos</button>
                     <button onclick="cat.filter('series')" id="btn-series" class="filter-btn bg-zinc-900 text-zinc-400 border border-zinc-800 hover:text-zinc-200 px-5 py-2 rounded-xl text-xs font-medium whitespace-nowrap transition-colors">Séries</button>
                     <button onclick="cat.filter('movie')" id="btn-movie" class="filter-btn bg-zinc-900 text-zinc-400 border border-zinc-800 hover:text-zinc-200 px-5 py-2 rounded-xl text-xs font-medium whitespace-nowrap transition-colors">Filmes</button>
@@ -1110,6 +1116,59 @@
                 if(!el) return;
                 if (isLoading) el.innerHTML = '<span class="loader w-3 h-3"></span>';
                 else el.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Conectado`;
+            },
+
+            // NOVA FUNÇÃO: UPLOAD EM LOTE DE JSONS
+            uploadEmMassa: async (input) => {
+                const files = input.files;
+                if (!files || files.length === 0) return;
+
+                const senha = prompt(`Vai enviar ${files.length} ficheiro(s) JSON. Digite a senha do sistema:`);
+                if (!senha) {
+                    input.value = ""; // Limpa a seleção se cancelar
+                    return;
+                }
+
+                let sucesso = 0;
+                let erro = 0;
+
+                showToast(`A processar ${files.length} ficheiros... aguarde.`, 'info');
+
+                for (let i = 0; i < files.length; i++) {
+                    const file = files[i];
+                    try {
+                        const text = await file.text();
+                        const json = JSON.parse(text);
+
+                        // Usa o nome do ficheiro (sem o .json) como nome no banco de dados
+                        let nomeArquivo = file.name.replace('.json', '');
+
+                        const formData = new FormData();
+                        formData.append("senha", senha);
+                        formData.append("nome", nomeArquivo);
+                        formData.append("conteudo", JSON.stringify(json));
+
+                        const response = await fetch('/upload', {
+                            method: 'POST',
+                            body: formData
+                        });
+
+                        if (response.ok) {
+                            sucesso++;
+                        } else {
+                            erro++;
+                        }
+                    } catch (error) {
+                        erro++;
+                        console.error(`Erro no ficheiro ${file.name}:`, error);
+                    }
+                }
+
+                input.value = ""; // Limpa a seleção no final
+                showToast(`Upload concluído! Sucesso: ${sucesso} | Erros: ${erro}`, erro > 0 ? 'warning' : 'success');
+                
+                // Atualiza o catálogo para mostrar os novos conteúdos enviados
+                cat.init();
             },
 
             openLinks: (id) => {
