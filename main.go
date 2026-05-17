@@ -21,9 +21,10 @@ const (
 )
 
 var (
-	db         *sql.DB
-	tmdbCache  sync.Map
-	httpClient = &http.Client{Timeout: 10 * time.Second}
+	db            *sql.DB
+	tmdbCache     sync.Map
+	cinemetaCache sync.Map // Novo cache para não sobrecarregar o Cinemeta
+	httpClient    = &http.Client{Timeout: 10 * time.Second}
 )
 
 // ==== ESTRUTURAS DO TMDB ====
@@ -81,6 +82,33 @@ func getTMDBInfo(id string, client *http.Client) TMDBData {
 		tmdbCache.Store(id, data)
 	}
 	return data
+}
+
+// ==== FUNÇÃO DE BUSCA NO CINEMETA (STREMIO) ====
+func getCinemetaInfo(id string, cType string, client *http.Client) map[string]interface{} {
+	cacheKey := id + "_" + cType
+	if cached, ok := cinemetaCache.Load(cacheKey); ok {
+		return cached.(map[string]interface{})
+	}
+
+	url := fmt.Sprintf("https://v3-cinemeta.strem.io/meta/%s/%s.json", cType, id)
+	req, _ := http.NewRequest("GET", url, nil)
+	req.Header.Set("User-Agent", "Mozilla/5.0")
+	
+	resp, err := client.Do(req)
+	if err != nil || resp.StatusCode != 200 {
+		return nil
+	}
+	defer resp.Body.Close()
+
+	var result struct {
+		Meta map[string]interface{} `json:"meta"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err == nil && result.Meta != nil {
+		cinemetaCache.Store(cacheKey, result.Meta)
+		return result.Meta
+	}
+	return nil
 }
 
 // ==== INICIALIZAÇÃO DO BANCO ====
@@ -185,13 +213,13 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// =========================================================================
-	// MAGIA TMDB/RPDB: Interceptar o JSON e injetar o Nome, Ano e Capa
+	// MAGIA TMDB/CINEMETA/RPDB: Interceptar o JSON e injetar dados
 	// =========================================================================
 	if strings.HasPrefix(nome, "tt") {
 		var data map[string]interface{}
 		if err := json.Unmarshal([]byte(conteudo), &data); err == nil {
 			
-			// Busca dados no TMDB
+			// 1. Busca dados no TMDB (Mais rápido para obter Título, Ano e Tipo base)
 			info := getTMDBInfo(nome, httpClient)
 			if info.Title != "" {
 				data["title"] = info.Title
@@ -201,8 +229,33 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 			
-			// Injeta a capa do RPDB baseada no ID do IMDb
-			data["poster"] = fmt.Sprintf("%s/imdb/poster-default/%s.jpg", RPDBBaseURL, nome)
+			// Determina o tipo (movie ou series) para buscar corretamente no Cinemeta
+			cType := "movie"
+			if t, ok := data["type"].(string); ok && t != "" {
+				cType = t
+			}
+
+			// 2. Busca dados no Cinemeta (Stremio)
+			cinemeta := getCinemetaInfo(nome, cType, httpClient)
+			if cinemeta != nil {
+				// Injeta a lista de vídeos (episódios oficiais) para o Catálogo contar os faltantes
+				if videos, ok := cinemeta["videos"]; ok {
+					data["cinemetaVideos"] = videos
+				}
+				// Injeta a descrição oficial (sinopse)
+				if desc, ok := cinemeta["description"]; ok && data["description"] == nil {
+					data["description"] = desc
+				}
+				// Injeta o background (imagem de fundo)
+				if bg, ok := cinemeta["background"]; ok && data["background"] == nil {
+					data["background"] = bg
+				}
+			}
+			
+			// 3. Injeta a capa do RPDB baseada no ID do IMDb
+			if data["poster"] == nil {
+				data["poster"] = fmt.Sprintf("%s/imdb/poster-default/%s.jpg", RPDBBaseURL, nome)
+			}
 			
 			// Garante que o ID está presente no JSON
 			if _, exists := data["id"]; !exists {
@@ -340,7 +393,6 @@ func pingHandler(w http.ResponseWriter, r *http.Request) {
 func corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
-		// Opcão DELETE readicionada conforme o seu snippet anterior
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS, DELETE")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 		if r.Method == "OPTIONS" {
