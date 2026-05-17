@@ -1,99 +1,1488 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-PT">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Meu Encurtador de Links</title>
+    <title>FenixFlix Studio</title>
+    
+    <link rel="icon" href="data:image/svg+xml,&lt;svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'&gt;&lt;path fill='%23facc15' d='M511.6 36.86l-64 415.1c-1.5 9.734-7.375 18.22-15.97 23.05c-4.844 2.719-10.27 4.097-15.68 4.097c-4.188 0-8.319-812-12.29-2.472l-122.6-69.66l-122.6 69.66c-3.973 1.66-8.106 2.472-12.29 2.472c-5.418 0-10.84-1.378-15.68-4.097c-8.594-4.828-14.47-13.32-15.97-23.05l-64-415.1C48.59 18.4 64.14 1.375 82.99 1.375c7.95 0 15.41 3.03 20.98 8.485l152 148.9l152-148.9c5.574-5.454 13.04-8.485 20.98-8.485C447.9 1.375 463.4 18.4 460.4 36.86z'/&gt;&lt;/svg&gt;">
+
+    <!-- Tipografia Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    colors: {
+                        zinc: { 850: '#111113', 900: '#18181b', 950: '#09090b' }
+                    }
+                }
+            }
+        }
+    </script>
+
     <style>
-        body { font-family: Arial, sans-serif; margin: 40px; max-width: 600px; }
-        .form-group { margin-bottom: 15px; }
-        label { display: block; font-weight: bold; margin-bottom: 5px; }
-        input { width: 100%; padding: 8px; box-sizing: border-box; }
-        button { padding: 10px 15px; background: #007bff; color: white; border: none; cursor: pointer; }
-        button:hover { background: #0056b3; }
-        .links-list { margin-top: 30px; }
-        .link-item { background: #f4f4f4; padding: 10px; margin-bottom: 10px; border-radius: 5px; }
+        body { background-color: #09090b; color: #e4e4e7; }
+        
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #27272a; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #3f3f46; }
+
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+        /* Inputs Minimalistas */
+        .input-unified {
+            background-color: #09090b;
+            border: 1px solid #27272a;
+            color: #f4f4f5;
+            transition: all 0.2s ease;
+        }
+        .input-unified:focus {
+            border-color: #6366f1;
+            box-shadow: 0 0 0 1px #6366f1;
+            outline: none;
+        }
+
+        .loader {
+            border: 2px solid #27272a;
+            border-top: 2px solid #a1a1aa;
+            border-radius: 50%;
+            width: 16px;
+            height: 16px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        .tab-content { display: none; animation: fadeSlide 0.25s ease-out forwards; }
+        .tab-content.active { display: block; }
+        @keyframes fadeSlide { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Botões de Navegação Ultra-Clean */
+        .nav-btn.active { background-color: #fafafa; color: #09090b; border-color: #fafafa; }
+        .nav-btn { background-color: transparent; color: #a1a1aa; border: 1px solid #27272a; }
+
+        @keyframes slideIn {
+            from { transform: translateY(100%) scale(0.95); opacity: 0; }
+            to { transform: translateY(0) scale(1); opacity: 1; }
+        }
+        .toast { animation: slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        
+        .progress-fill { transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1); }
     </style>
 </head>
-<body>
+<body class="min-h-screen flex flex-col selection:bg-indigo-500/30">
 
-    <h2>🔗 Adicionar Novo Link</h2>
-    
-    <div class="form-group">
-        <label>Nome Curto (ex: filme1):</label>
-        <input type="text" id="linkName" placeholder="Digite o nome curto">
-    </div>
-    <div class="form-group">
-        <label>URL Original (Link longo):</label>
-        <input type="text" id="linkUrl" placeholder="https://...">
-    </div>
-    <div class="form-group">
-        <label>Senha do Admin:</label>
-        <input type="password" id="linkPassword" placeholder="Sua senha secreta">
-    </div>
-    <button onclick="adicionarLink()">Salvar Link</button>
+    <!-- Navbar Minimalista -->
+    <nav class="sticky top-0 z-50 bg-zinc-950/80 backdrop-blur-xl border-b border-zinc-900">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center overflow-x-auto scrollbar-hide">
+            <div class="flex items-center gap-3 mr-6 flex-shrink-0">
+                <i class="fa-brands fa-phoenix-squadron text-white text-xl"></i>
+                <div>
+                    <h1 class="font-semibold text-base leading-tight tracking-tight text-white">FenixFlix Studio</h1>
+                </div>
+            </div>
+            
+            <div class="flex gap-2 flex-shrink-0">
+                <button onclick="switchView('generator')" id="btn-generator" class="nav-btn px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 hover:bg-zinc-900">
+                    <i class="fa-solid fa-code"></i> <span class="hidden sm:inline">Criar JSON</span>
+                </button>
+                <button onclick="switchView('requests')" id="btn-requests" class="nav-btn px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 hover:bg-zinc-900">
+                    <i class="fa-solid fa-list-check"></i> <span class="hidden md:inline">Pedidos</span>
+                </button>
+                <button onclick="switchView('catalog'); setTimeout(() => cat.filter('all'), 50);" id="btn-catalog" class="nav-btn active px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
+                    <i class="fa-solid fa-layer-group"></i> <span class="hidden sm:inline">Catálogo</span>
+                </button>
+            </div>
+        </div>
+    </nav>
 
-    <div class="links-list">
-        <h2>Últimos Links Adicionados</h2>
-        <button onclick="carregarLinks()" style="margin-bottom: 15px; background: #28a745;">🔄 Atualizar Lista</button>
-        <div id="listaDeLinks"></div>
+    <main class="flex-grow p-4 md:p-8 max-w-7xl mx-auto w-full">
+
+        <!-- ABA 1: GERADOR -->
+        <div id="view-generator" class="tab-content">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div class="lg:col-span-2 space-y-6">
+                    <div class="bg-zinc-900 rounded-2xl border border-zinc-800 p-6 md:p-8">
+                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+                            <h2 class="text-lg font-semibold text-white">Detalhes do Conteúdo</h2>
+                            <div class="flex gap-2 w-full sm:w-auto">
+                                <label class="cursor-pointer bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-4 py-2 rounded-lg text-xs font-medium transition flex-1 sm:flex-none text-center">
+                                    Importar JSON
+                                    <input type="file" accept=".json" class="hidden" onchange="gen.loadExistingJson(this)">
+                                </label>
+                                <button onclick="gen.reset()" class="text-xs font-medium bg-zinc-950 hover:bg-zinc-800 text-zinc-400 border border-zinc-800 px-4 py-2 rounded-lg transition flex-1 sm:flex-none">
+                                    Limpar
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Tipo de Conteúdo -->
+                        <div class="flex gap-6 mb-8 border-b border-zinc-800 pb-6">
+                            <label class="flex items-center gap-2 cursor-pointer group">
+                                <input type="radio" name="contentType" value="series" checked="" onchange="gen.toggleInputs()" class="w-4 h-4 text-indigo-500 bg-zinc-950 border-zinc-800 focus:ring-indigo-500">
+                                <span class="font-medium text-sm text-zinc-400 group-hover:text-zinc-200 transition">Série / Anime</span>
+                            </label>
+                            <label class="flex items-center gap-2 cursor-pointer group">
+                                <input type="radio" name="contentType" value="movie" onchange="gen.toggleInputs()" class="w-4 h-4 text-indigo-500 bg-zinc-950 border-zinc-800 focus:ring-indigo-500">
+                                <span class="font-medium text-sm text-zinc-400 group-hover:text-zinc-200 transition">Filme</span>
+                            </label>
+                        </div>
+
+                        <!-- Campos Principais -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-5 mb-6">
+                            <div class="md:col-span-2">
+                                <label class="block text-xs font-medium text-zinc-500 mb-2">Nome do Arquivo</label>
+                                <input type="text" id="seriesName" class="input-unified w-full p-3 rounded-lg text-sm" placeholder="Ex: Breaking Bad">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-zinc-500 mb-2">ID IMDb <span class="text-red-400">*</span></label>
+                                <input type="text" id="contentId" class="input-unified w-full p-3 rounded-lg font-mono text-sm" placeholder="tt0903747">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-zinc-500 mb-2">Idioma / Áudio</label>
+                                <select id="audioLanguage" class="input-unified w-full p-3 rounded-lg text-sm appearance-none">
+                                    <option value="Dublado">Dublado</option>
+                                    <option value="Legendado">Legendado</option>
+                                    <option value="Nacional">Nacional</option>
+                                    <option value="Dual Áudio">Dual Áudio</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Temporadas (Séries) -->
+                        <div id="seasonContainer" class="bg-zinc-950/50 p-5 rounded-xl border border-zinc-800/50 mb-6">
+                            <div class="flex flex-wrap gap-4 items-end">
+                                <div class="w-full sm:w-24">
+                                    <label class="block text-[10px] font-medium text-zinc-500 uppercase mb-2">Temporada</label>
+                                    <input type="number" id="seasonNum" value="1" class="input-unified w-full p-3 rounded-lg text-center text-sm">
+                                </div>
+                                <div class="w-full sm:w-24">
+                                    <label class="block text-[10px] font-medium text-zinc-500 uppercase mb-2">Ep. Inicial</label>
+                                    <input type="number" id="startEp" value="1" class="input-unified w-full p-3 rounded-lg text-center text-sm">
+                                </div>
+                                <div class="flex-1 min-w-[200px] text-xs text-zinc-500 pb-2">
+                                    <span class="text-zinc-300 font-medium">Smart Detect:</span> Cole "S01E01" ou "1x01" na lista de links.
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Links -->
+                        <div>
+                            <div class="flex justify-between items-end mb-3">
+                                <label class="block text-xs font-medium text-zinc-500">Links de Transmissão</label>
+                                <div class="flex gap-2">
+                                    <button onclick="gen.migrateHost()" class="text-[10px] text-zinc-400 hover:text-white px-2 py-1 rounded transition flex items-center gap-1">
+                                        <i class="fa-solid fa-rotate"></i> Migrar Render
+                                    </button>
+                                    <label class="text-[10px] text-zinc-400 hover:text-white px-2 py-1 rounded cursor-pointer transition flex items-center gap-1">
+                                        <input type="file" accept=".txt" class="hidden" onchange="gen.loadTxt(this)">
+                                        <i class="fa-solid fa-file-lines"></i> TXT
+                                    </label>
+                                </div>
+                            </div>
+                            <textarea id="manualLinks" rows="6" class="input-unified w-full p-4 rounded-xl text-xs font-mono custom-scrollbar" placeholder="Cole os links de vídeo diretos aqui..."></textarea>
+                        </div>
+
+                        <button onclick="gen.process()" class="mt-6 w-full bg-white hover:bg-zinc-200 text-zinc-950 font-medium py-3.5 rounded-xl transition flex justify-center items-center gap-2">
+                            Processar Conteúdo
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Painel de Preview -->
+                <div class="lg:col-span-1">
+                    <div class="bg-zinc-900 rounded-2xl border border-zinc-800 flex flex-col h-full">
+                        <div class="p-5 border-b border-zinc-800 flex justify-between items-center">
+                            <h3 class="font-medium text-white text-sm">Preview JSON</h3>
+                            <span id="jsonStats" class="text-[10px] font-mono text-zinc-500">Vazio</span>
+                        </div>
+                        
+                        <div class="flex-grow relative bg-zinc-950 p-5 overflow-hidden">
+                            <textarea id="jsonOutput" class="w-full text-xs text-zinc-400 bg-transparent font-mono h-full min-h-[400px] focus:outline-none resize-none custom-scrollbar" spellcheck="false" oninput="gen.syncManualEdit()" placeholder="// O resultado aparecerá aqui..."></textarea>
+                            
+                            <div id="resultActions" class="absolute bottom-5 right-5 flex gap-2 hidden">
+                                <button onclick="gen.openVisualEditor()" class="bg-zinc-800 hover:bg-zinc-700 text-white px-4 py-2 rounded-lg border border-zinc-700 text-xs font-medium flex items-center gap-2 transition" title="Gerir Links Visualmente">
+                                    Gerir Links
+                                </button>
+                                <button onclick="gen.copy()" class="bg-zinc-800 hover:bg-zinc-700 text-white p-2 rounded-lg border border-zinc-700 transition" title="Copiar JSON">
+                                    <i class="fa-regular fa-copy"></i>
+                                </button>
+                                <button onclick="gen.download()" class="bg-white hover:bg-zinc-200 text-zinc-950 p-2 rounded-lg transition" title="Baixar Arquivo .json">
+                                    <i class="fa-solid fa-download"></i>
+                                </button>
+                                <!-- NOVO BOTÃO DE UPLOAD PARA O BANCO DE DADOS -->
+                                <button onclick="gen.uploadParaBanco()" class="bg-indigo-600 hover:bg-indigo-500 text-white p-2 rounded-lg transition shadow-lg shadow-indigo-500/20" title="Salvar JSON no Banco">
+                                    <i class="fa-solid fa-cloud-arrow-up"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="p-4 rounded-b-2xl border-t border-zinc-800 text-xs text-zinc-500 text-center truncate">
+                            Arquivo final: <span id="fileNamePreview" class="text-zinc-300 font-mono">data.json</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ABA 2: CATÁLOGO -->
+        <div id="view-catalog" class="tab-content active">
+            
+            <!-- Cards de Status -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                <div class="bg-zinc-900 p-5 rounded-2xl border border-zinc-800 flex flex-col justify-center">
+                    <p class="text-zinc-500 text-[10px] font-semibold uppercase tracking-wider mb-1">Filmes</p>
+                    <p id="countMovies" class="text-2xl font-medium text-white">0</p>
+                </div>
+                <div class="bg-zinc-900 p-5 rounded-2xl border border-zinc-800 flex flex-col justify-center">
+                    <p class="text-zinc-500 text-[10px] font-semibold uppercase tracking-wider mb-1">Séries</p>
+                    <p id="countSeries" class="text-2xl font-medium text-white">0</p>
+                </div>
+                <div class="bg-zinc-900 p-5 rounded-2xl border border-zinc-800 flex flex-col justify-center">
+                    <p class="text-zinc-500 text-[10px] font-semibold uppercase tracking-wider mb-1">Episódios Totais</p>
+                    <p id="countTotalEps" class="text-2xl font-medium text-white">0</p>
+                </div>
+                <div class="bg-zinc-900 p-5 rounded-2xl border border-zinc-800 flex flex-col justify-center">
+                    <p class="text-zinc-500 text-[10px] font-semibold uppercase tracking-wider mb-1">Incompletos</p>
+                    <p id="countMissing" class="text-2xl font-medium text-white">0</p>
+                </div>
+            </div>
+
+            <!-- Ferramentas e Filtros -->
+            <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-8">
+                <div class="flex flex-col sm:flex-row w-full lg:w-auto gap-3">
+                    <div class="relative w-full sm:w-72">
+                        <i class="fa-solid fa-search absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500 text-xs"></i>
+                        <input type="text" oninput="cat.search(this.value)" placeholder="Buscar catálogo..." class="w-full bg-zinc-900 text-zinc-200 text-sm rounded-xl pl-10 pr-4 py-2.5 border border-zinc-800 focus:border-zinc-600 focus:outline-none transition-colors">
+                    </div>
+                    
+                    <div class="relative w-full sm:w-48">
+                        <select onchange="cat.sort(this.value)" class="w-full bg-zinc-900 text-zinc-200 text-sm rounded-xl px-4 py-2.5 border border-zinc-800 focus:border-zinc-600 focus:outline-none appearance-none cursor-pointer">
+                            <option value="newest">Mais Recentes</option>
+                            <option value="oldest">Mais Antigos</option>
+                            <option value="year">Ano de Lançamento</option>
+                            <option value="name">Ordem Alfabética</option>
+                        </select>
+                        <i class="fa-solid fa-chevron-down absolute right-4 top-1/2 -translate-y-1/2 text-zinc-600 text-xs pointer-events-none"></i>
+                    </div>
+                </div>
+                
+                <div class="flex gap-2 w-full lg:w-auto overflow-x-auto pb-2 lg:pb-0 scrollbar-hide items-center">
+                    <button onclick="cat.init()" class="bg-zinc-900 text-zinc-400 border border-zinc-800 hover:text-white px-4 py-2 rounded-xl text-xs font-medium whitespace-nowrap transition-colors flex items-center gap-2 mr-2">
+                        <i class="fa-solid fa-rotate"></i> Atualizar
+                    </button>
+                    
+                    <button onclick="cat.filter('all')" id="btn-all" class="filter-btn bg-white text-zinc-900 px-5 py-2 rounded-xl text-xs font-medium whitespace-nowrap transition-colors shadow-sm">Todos</button>
+                    <button onclick="cat.filter('series')" id="btn-series" class="filter-btn bg-zinc-900 text-zinc-400 border border-zinc-800 hover:text-zinc-200 px-5 py-2 rounded-xl text-xs font-medium whitespace-nowrap transition-colors">Séries</button>
+                    <button onclick="cat.filter('movie')" id="btn-movie" class="filter-btn bg-zinc-900 text-zinc-400 border border-zinc-800 hover:text-zinc-200 px-5 py-2 rounded-xl text-xs font-medium whitespace-nowrap transition-colors">Filmes</button>
+                    
+                    <div class="w-px h-6 bg-zinc-800 mx-1 hidden sm:block"></div>
+                    
+                    <button onclick="cat.filter('missing_all')" id="btn-missing_all" class="filter-btn bg-zinc-900 text-amber-500 border border-zinc-800 hover:bg-zinc-800 px-5 py-2 rounded-xl text-xs font-medium whitespace-nowrap transition-colors flex items-center gap-2">
+                        <i class="fa-solid fa-triangle-exclamation"></i> Incompletos
+                    </button>
+                </div>
+            </div>
+
+            <!-- Grade do Catálogo -->
+            <div id="gridContainer" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 md:gap-6 pb-20">
+                <!-- Preenchido via JS -->
+            </div>
+            
+            <!-- Status API Canto Inferior -->
+            <div class="fixed bottom-6 right-6 hidden md:block z-40 bg-zinc-900/80 backdrop-blur border border-zinc-800 px-4 py-2 rounded-full shadow-lg">
+                <span id="apiStatus" class="text-[10px] text-zinc-400 flex items-center gap-2 font-medium uppercase tracking-wider">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Conectado
+                </span>
+            </div>
+        </div>
+
+        <!-- ABA 3: PEDIDOS / TXT -->
+        <div id="view-requests" class="tab-content">
+            <div class="bg-zinc-900 rounded-2xl border border-zinc-800 p-6 md:p-8">
+                
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-8 border-b border-zinc-800 pb-8">
+                    <div>
+                        <h2 class="text-lg font-semibold text-white">Análise de Pedidos Ausentes</h2>
+                        <p class="text-sm text-zinc-500 mt-1">Carregue logs TXT para identificar e gerir conteúdo em falta.</p>
+                    </div>
+                    
+                    <div class="flex flex-wrap gap-3">
+                        <label class="cursor-pointer bg-white hover:bg-zinc-200 text-zinc-950 px-4 py-2 rounded-lg text-xs font-medium transition flex items-center gap-2">
+                            Ler TXT
+                            <input type="file" accept=".txt" class="hidden" onchange="reqProcessor.handleUpload(this)">
+                        </label>
+                        <label class="cursor-pointer bg-zinc-800 hover:bg-zinc-700 text-white px-4 py-2 rounded-lg text-xs font-medium border border-zinc-700 transition flex items-center gap-2">
+                            Restaurar JSON
+                            <input type="file" accept=".json" class="hidden" onchange="reqProcessor.handleJsonUpload(this)">
+                        </label>
+                        <button onclick="reqProcessor.clearData()" class="bg-zinc-950 hover:bg-red-950 text-zinc-400 hover:text-red-400 border border-zinc-800 hover:border-red-900 px-3 py-2 rounded-lg transition flex items-center justify-center">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                    <div class="bg-zinc-950 p-4 rounded-xl border border-zinc-800/50">
+                        <p class="text-zinc-500 text-[10px] font-semibold uppercase mb-1">Linhas Analisadas</p>
+                        <p id="req-total-lines" class="text-xl font-medium text-white">0</p>
+                    </div>
+                    <div class="bg-zinc-950 p-4 rounded-xl border border-zinc-800/50">
+                        <p class="text-zinc-500 text-[10px] font-semibold uppercase mb-1">Ocorrências</p>
+                        <p id="req-total-requests" class="text-xl font-medium text-white">0</p>
+                    </div>
+                    <div class="bg-zinc-950 p-4 rounded-xl border border-zinc-800/50">
+                        <p class="text-zinc-500 text-[10px] font-semibold uppercase mb-1">Filmes Únicos</p>
+                        <p id="req-movies-count" class="text-xl font-medium text-white">0</p>
+                    </div>
+                    <div class="bg-zinc-950 p-4 rounded-xl border border-zinc-800/50">
+                        <p class="text-zinc-500 text-[10px] font-semibold uppercase mb-1">Séries Únicas</p>
+                        <p id="req-series-count" class="text-xl font-medium text-white">0</p>
+                    </div>
+                </div>
+
+                <div id="req-search-row" class="hidden flex flex-col sm:flex-row gap-3 mb-6">
+                    <div class="relative flex-1">
+                        <i class="fa-solid fa-search absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500 text-xs"></i>
+                        <input type="text" id="req-search" oninput="reqProcessor.renderList()" placeholder="Buscar ausentes..." class="w-full bg-zinc-950 text-white text-sm rounded-xl pl-10 pr-4 py-2 border border-zinc-800 focus:border-zinc-600 focus:outline-none transition-colors">
+                    </div>
+                    <select id="req-sort" onchange="reqProcessor.renderList()" class="bg-zinc-950 text-white text-sm rounded-xl px-4 py-2 border border-zinc-800 focus:outline-none appearance-none cursor-pointer">
+                        <option value="count">Mais Pedidos</option>
+                        <option value="alpha">A-Z</option>
+                        <option value="type">Por Tipo</option>
+                    </select>
+                    <select id="req-filter-type" onchange="reqProcessor.renderList()" class="bg-zinc-950 text-white text-sm rounded-xl px-4 py-2 border border-zinc-800 focus:outline-none appearance-none cursor-pointer">
+                        <option value="all">Todos Tipos</option>
+                        <option value="movie">Filmes</option>
+                        <option value="series">Séries</option>
+                    </select>
+                </div>
+
+                <div class="bg-zinc-950 rounded-xl border border-zinc-800 p-4 max-h-[500px] overflow-y-auto custom-scrollbar mb-6">
+                    <div id="req-results-container" class="space-y-2">
+                        <div class="text-center py-12 text-zinc-600 flex flex-col items-center">
+                            <p class="text-sm font-medium">Aguardando dados.</p>
+                            <span id="req-loading-status" class="text-[10px] uppercase tracking-wider mt-2">Pronto para leitura</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="flex justify-end gap-3">
+                    <button onclick="reqProcessor.downloadJson()" id="btn-download-json" class="hidden bg-zinc-800 hover:bg-zinc-700 text-white px-4 py-2 rounded-lg text-xs font-medium border border-zinc-700 transition">Salvar Progresso JSON</button>
+                    <button onclick="reqProcessor.downloadCsv()" id="btn-download-csv" class="hidden bg-zinc-800 hover:bg-zinc-700 text-white px-4 py-2 rounded-lg text-xs font-medium border border-zinc-700 transition">Exportar CSV</button>
+                    <button onclick="reqProcessor.downloadTxt()" id="btn-download-txt" class="hidden bg-white hover:bg-zinc-200 text-zinc-900 px-4 py-2 rounded-lg text-xs font-medium transition">Relatório TXT</button>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Modal do Catálogo (Ver Links) -->
+    <div id="linkModal" class="fixed inset-0 bg-black/90 backdrop-blur-sm hidden flex items-center justify-center z-[100] p-4">
+        <div class="bg-zinc-900 w-full max-w-2xl rounded-2xl shadow-2xl border border-zinc-800 flex flex-col max-h-[85vh] overflow-hidden">
+            <div class="p-6 border-b border-zinc-800 flex justify-between items-start gap-4 bg-zinc-900">
+                <div>
+                    <h3 id="modalTitle" class="text-lg font-semibold text-white leading-tight">Título</h3>
+                    <div id="modalStats" class="mt-2 flex items-center gap-3 text-xs"></div>
+                </div>
+                <div class="flex gap-2 items-center flex-shrink-0">
+                    <button id="btnModalEdit" class="text-[10px] uppercase font-bold bg-white text-zinc-900 hover:bg-zinc-200 px-3 py-2 rounded-lg transition">Editar JSON</button>
+                    <button onclick="cat.closeModal()" class="text-zinc-500 hover:text-white bg-zinc-950 border border-zinc-800 hover:bg-zinc-800 w-9 h-9 rounded-full transition flex items-center justify-center"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+            </div>
+            <div id="modalContent" class="p-6 overflow-y-auto space-y-2 bg-zinc-950 flex-grow custom-scrollbar"></div>
+            <div class="p-4 bg-zinc-900 border-t border-zinc-800 flex justify-between items-center text-[10px] font-medium text-zinc-500 uppercase tracking-wider">
+                <span>Clique num item para copiar o URL</span>
+                <span id="modalTotalLinks">0 links</span>
+            </div>
+        </div>
     </div>
+
+    <!-- Modal do Gestor Visual de Links -->
+    <div id="visualEditorModal" class="fixed inset-0 bg-black/90 backdrop-blur-sm hidden flex items-center justify-center z-[150] p-4">
+        <div class="bg-zinc-900 w-full max-w-4xl rounded-2xl shadow-2xl border border-zinc-800 flex flex-col max-h-[85vh] overflow-hidden">
+            <div class="p-6 border-b border-zinc-800 flex justify-between items-center bg-zinc-900">
+                <div>
+                    <h3 class="text-lg font-semibold text-white">Gestor de Links</h3>
+                    <p class="text-xs text-zinc-500 mt-1">Altere nomes ou remova URLs do arquivo gerado.</p>
+                </div>
+                <button onclick="gen.closeVisualEditor()" class="text-zinc-500 hover:text-white bg-zinc-950 border border-zinc-800 hover:bg-zinc-800 w-9 h-9 rounded-full transition flex items-center justify-center"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div id="visualEditorContent" class="p-6 overflow-y-auto space-y-3 bg-zinc-950 flex-grow custom-scrollbar"></div>
+            <div class="p-5 bg-zinc-900 border-t border-zinc-800 flex justify-end gap-3">
+                <button onclick="gen.closeVisualEditor()" class="px-5 py-2.5 bg-zinc-950 border border-zinc-800 hover:bg-zinc-800 text-zinc-300 text-xs font-medium rounded-xl transition">Descartar</button>
+                <button onclick="gen.saveVisualEditor()" class="px-6 py-2.5 bg-white hover:bg-zinc-200 text-zinc-900 text-xs font-medium rounded-xl transition">Salvar Mudanças</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Container de Toasts (Notificações) -->
+    <div id="toast-container" class="fixed bottom-6 left-1/2 -translate-x-1/2 md:translate-x-0 md:left-auto md:right-6 z-[200] flex flex-col gap-2 pointer-events-none w-[90%] md:w-auto"></div>
 
     <script>
-        // Função para Adicionar Link
-        async function adicionarLink() {
-            const name = document.getElementById('linkName').value;
-            const url = document.getElementById('linkUrl').value;
-            const password = document.getElementById('linkPassword').value;
-
-            if (!name || !url || !password) {
-                alert("Preencha todos os campos!");
-                return;
-            }
-
-            const response = await fetch('/api/add', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name, url, password })
-            });
-
-            const data = await response.json();
-
-            if (response.ok) {
-                alert("Link adicionado com sucesso!");
-                carregarLinks(); // Recarrega a lista
-            } else {
-                alert("Erro: " + data.error);
-            }
-        }
-
-        // Função para Carregar a Lista de Links
-        async function carregarLinks() {
-            const response = await fetch('/api/all');
-            const links = await response.json();
-            const divLista = document.getElementById('listaDeLinks');
+        // --- UTILIDADES ---
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
             
-            divLista.innerHTML = ''; // Limpa a lista atual
+            const colors = { success: 'bg-zinc-900 border-zinc-800 text-white', error: 'bg-red-950 border-red-900 text-red-100', info: 'bg-zinc-900 border-zinc-800 text-white', warning: 'bg-zinc-900 border-zinc-800 text-zinc-300' };
+            const icons = { success: 'fa-check text-emerald-400', error: 'fa-xmark text-red-400', info: 'fa-info text-blue-400', warning: 'fa-triangle-exclamation text-amber-400' };
 
-            if (links.length === 0) {
-                divLista.innerHTML = '<p>Nenhum link cadastrado ainda.</p>';
-                return;
-            }
+            toast.className = `toast flex items-center gap-3 px-5 py-3.5 rounded-xl shadow-2xl border ${colors[type] || colors.info} min-w-[280px]`;
+            toast.innerHTML = `<i class="fa-solid ${icons[type]} text-sm"></i><span class="text-xs font-medium">${message}</span>`;
 
-            links.forEach(link => {
-                const linkEncurtado = window.location.origin + '/' + link.name;
-                divLista.innerHTML += `
-                    <div class="link-item">
-                        <strong>Nome:</strong> ${link.name} <br>
-                        <strong>Link Curto:</strong> <a href="${linkEncurtado}" target="_blank">${linkEncurtado}</a> <br>
-                        <strong>Destino:</strong> <span style="word-break: break-all; font-size: 0.9em; color: #555;">${link.url}</span>
-                    </div>
-                `;
-            });
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateY(100%) scale(0.95)';
+                toast.style.transition = 'all 0.3s ease';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
         }
 
-        // Carrega a lista automaticamente quando a página abre
-        carregarLinks();
+        const escapeHTML = str => (str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/\n/g, '&#10;');
+
+        function switchView(viewName) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.classList.remove('active', 'bg-white', 'text-zinc-900', 'border-white');
+                btn.classList.add('bg-transparent', 'text-zinc-400', 'border-zinc-800');
+            });
+
+            document.getElementById(`view-${viewName}`).classList.add('active');
+            
+            const activeBtn = document.getElementById(`btn-${viewName}`);
+            if(activeBtn) {
+                activeBtn.classList.add('active', 'bg-white', 'text-zinc-900', 'border-white');
+                activeBtn.classList.remove('bg-transparent', 'text-zinc-400', 'border-zinc-800');
+            }
+
+            if(viewName === 'catalog' && cat.allItems.length === 0) {
+                cat.init();
+            }
+        }
+
+        // --- MÓDULO 1: GERADOR DE JSON E GESTOR VISUAL ---
+        const gen = {
+            currentData: null,
+            editData: null, 
+            
+            init: () => {
+                const saved = localStorage.getItem('fenixflix_draft');
+                if(saved) {
+                    try {
+                        gen.currentData = JSON.parse(saved);
+                        document.getElementById('contentId').value = gen.currentData.id || '';
+                        if(gen.currentData.type) {
+                            document.querySelector(`input[name="contentType"][value="${gen.currentData.type}"]`).checked = true;
+                            gen.toggleInputs();
+                        }
+                        gen.updateDisplay(false);
+                    } catch(e) { localStorage.removeItem('fenixflix_draft'); }
+                }
+            },
+            toggleInputs: () => {
+                const type = document.querySelector('input[name="contentType"]:checked').value;
+                document.getElementById('seasonContainer').style.display = type === 'series' ? 'block' : 'none';
+            },
+            loadExistingJson: (input) => {
+                const file = input.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const json = JSON.parse(e.target.result);
+                        gen.currentData = json;
+                        if (json.id) document.getElementById('contentId').value = json.id;
+                        if (json.type) {
+                            document.querySelector(`input[name="contentType"][value="${json.type}"]`).checked = true;
+                            gen.toggleInputs();
+                        }
+                        const name = file.name.replace('.json', '');
+                        if (!name.startsWith('tt')) document.getElementById('seriesName').value = name;
+                        gen.updateDisplay();
+                        showToast('JSON carregado com sucesso!');
+                    } catch (err) { showToast("Arquivo JSON inválido", "error"); }
+                };
+                reader.readAsText(file);
+            },
+            loadTxt: (input) => {
+                const file = input.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = e => {
+                    document.getElementById('manualLinks').value = e.target.result;
+                    showToast('TXT carregado');
+                };
+                reader.readAsText(file);
+            },
+            migrateHost: () => {
+                const input = document.getElementById('manualLinks');
+                const oldHost = "https://passing-melinda-onomed1-d0cbec40.koyeb.app";
+                const newHost = "https://hd-telegram.onrender.com"; 
+
+                if (!input.value.trim()) return showToast("Cole os links primeiro!", "warning");
+                const originalText = input.value;
+                if (!originalText.includes(oldHost)) {
+                    return showToast("Nenhum link antigo (Koyeb) encontrado.", "info");
+                }
+                const newText = originalText.split(oldHost).join(newHost);
+                input.value = newText;
+                showToast("Domínios atualizados para Render!", "success");
+            },
+            reset: () => {
+                if(confirm('Limpar todos os campos?')) {
+                    gen.currentData = null;
+                    document.getElementById('contentId').value = '';
+                    document.getElementById('seriesName').value = '';
+                    document.getElementById('manualLinks').value = '';
+                    document.getElementById('jsonOutput').value = '';
+                    document.getElementById('jsonStats').innerText = 'Vazio';
+                    document.getElementById('resultActions').classList.add('hidden');
+                    localStorage.removeItem('fenixflix_draft');
+                    showToast('Campos limpos', 'info');
+                }
+            },
+            cleanUrl: (line) => {
+                const match = line.match(/(https?:\/\/[^\s]+)/);
+                if (!match) return null;
+                let clean = match[1].trim();
+                if (!clean.includes('&d=true') && !clean.includes('?d=true')) {
+                    clean += clean.includes('?') ? '&d=true' : '?d=true';
+                }
+                return clean;
+            },
+            process: () => {
+                const id = document.getElementById('contentId').value.trim();
+                if (!id) return showToast("ID (IMDb) é obrigatório!", "error");
+
+                const type = document.querySelector('input[name="contentType"]:checked').value;
+                const baseAudio = document.getElementById('audioLanguage').value;
+                const rawText = document.getElementById('manualLinks').value;
+                
+                if (!rawText.trim()) return showToast("Cole os links primeiro.", "error");
+
+                if (!gen.currentData) gen.currentData = { "id": id, "type": type, "streams": type === 'series' ? {} : [] };
+                else { gen.currentData.id = id; gen.currentData.type = type; }
+
+                const lines = rawText.split('\n').map(l => l.trim()).filter(l => l);
+                let addedCount = 0;
+
+                if (type === 'series') {
+                    let manualSeason = document.getElementById('seasonNum').value || '1';
+                    let manualEp = parseInt(document.getElementById('startEp').value) || 1;
+                    let currentSmartSeason = null;
+                    let currentSmartEp = null;
+
+                    lines.forEach(line => {
+                        const sxeMatch = line.match(/S(\d+)\s*E(\d+)|(\d+)x(\d+)/i);
+                        if (sxeMatch) {
+                            const s = parseInt(sxeMatch[1] || sxeMatch[3]).toString();
+                            const e = parseInt(sxeMatch[2] || sxeMatch[4]).toString();
+                            currentSmartSeason = s;
+                            currentSmartEp = e;
+                            return; 
+                        }
+                        const url = gen.cleanUrl(line);
+                        if (url) {
+                            const targetSeason = currentSmartSeason || manualSeason;
+                            const targetEp = currentSmartEp || manualEp.toString();
+
+                            if (!gen.currentData.streams[targetSeason]) gen.currentData.streams[targetSeason] = {};
+                            if (!gen.currentData.streams[targetSeason][targetEp]) gen.currentData.streams[targetSeason][targetEp] = [];
+                            
+                            gen.currentData.streams[targetSeason][targetEp].push({ "url": url, "name": `${baseAudio}\nFenixflix` });
+                            addedCount++;
+                            
+                            if (currentSmartSeason) {
+                                currentSmartEp = null;
+                            } else {
+                                manualEp++;
+                            }
+                        }
+                    });
+                    if(!currentSmartSeason) document.getElementById('startEp').value = manualEp;
+                } else {
+                    if(!Array.isArray(gen.currentData.streams)) gen.currentData.streams = [];
+                    lines.forEach(line => {
+                        const url = gen.cleanUrl(line);
+                        if(url) {
+                            const count = gen.currentData.streams.filter(s => s.name.startsWith(baseAudio)).length;
+                            const finalName = count > 0 ? `${baseAudio} ${count + 1}\nFenixflix` : `${baseAudio}\nFenixflix`;
+                            gen.currentData.streams.push({ "url": url, "name": finalName });
+                            addedCount++;
+                        }
+                    });
+                }
+                gen.updateDisplay();
+                document.getElementById('manualLinks').value = '';
+                showToast(`${addedCount} links processados!`);
+            },
+            updateDisplay: (save = true) => {
+                const jsonStr = JSON.stringify(gen.currentData, null, 4);
+                document.getElementById('jsonOutput').value = jsonStr;
+                document.getElementById('resultActions').classList.remove('hidden');
+                
+                let stats = '';
+                if (gen.currentData.type === 'series') {
+                    const seasons = Object.keys(gen.currentData.streams || {}).sort((a,b)=>parseInt(a)-parseInt(b));
+                    stats = `${seasons.length} Temporada(s)`;
+                } else {
+                    stats = `${gen.currentData.streams.length} Opções`;
+                }
+                document.getElementById('jsonStats').innerText = stats;
+                
+                const fName = document.getElementById('seriesName').value.trim() || gen.currentData.id;
+                document.getElementById('fileNamePreview').innerText = `${fName}.json`;
+
+                if(save) localStorage.setItem('fenixflix_draft', jsonStr);
+            },
+            syncManualEdit: () => {
+                try {
+                    const rawValue = document.getElementById('jsonOutput').value;
+                    gen.currentData = JSON.parse(rawValue);
+                    
+                    let stats = '';
+                    if (gen.currentData.type === 'series') {
+                        const seasons = Object.keys(gen.currentData.streams || {}).sort((a,b)=>parseInt(a)-parseInt(b));
+                        stats = `${seasons.length} Temp.`;
+                    } else {
+                        stats = `${gen.currentData.streams ? gen.currentData.streams.length : 0} Opções`;
+                    }
+                    document.getElementById('jsonStats').innerText = stats;
+                    localStorage.setItem('fenixflix_draft', rawValue);
+                } catch (e) {
+                    document.getElementById('jsonStats').innerText = 'JSON Inválido';
+                }
+            },
+            copy: () => {
+                navigator.clipboard.writeText(document.getElementById('jsonOutput').value).then(() => showToast("JSON copiado!"));
+            },
+            download: () => {
+                if (!gen.currentData) return;
+                const customName = document.getElementById('seriesName').value.trim();
+                const fileName = customName ? customName : (gen.currentData.id || 'data');
+                const blob = new Blob([JSON.stringify(gen.currentData, null, 4)], { type: 'application/json' });
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = `${fileName}.json`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                showToast("Download iniciado");
+            },
+
+            // --- NOVA FUNÇÃO: UPLOAD PARA O POSTGRESQL ---
+            uploadParaBanco: async () => {
+                if (!gen.currentData) return showToast("Nenhum JSON para enviar!", "warning");
+                
+                const senha = prompt("Digite a senha do sistema para salvar no banco:");
+                if (!senha) return;
+
+                const nomeArquivo = document.getElementById('seriesName').value.trim() || gen.currentData.id;
+
+                try {
+                    const formData = new FormData();
+                    formData.append("senha", senha);
+                    formData.append("nome", nomeArquivo);
+                    formData.append("conteudo", JSON.stringify(gen.currentData));
+
+                    const response = await fetch('/upload', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    const result = await response.json();
+                    
+                    if (response.ok) {
+                        showToast(result.mensagem, "success");
+                    } else {
+                        showToast("Erro: " + result.erro, "error");
+                    }
+                } catch (error) {
+                    showToast("Erro ao conectar com o servidor", "error");
+                }
+            },
+
+            // Gestor Visual
+            openVisualEditor: () => {
+                if (!gen.currentData || !gen.currentData.streams) {
+                    return showToast("Ainda não há links adicionados.", "warning");
+                }
+                gen.editData = JSON.parse(JSON.stringify(gen.currentData));
+                gen.renderVisualEditorContent();
+                document.getElementById('visualEditorModal').classList.remove('hidden');
+            },
+
+            closeVisualEditor: () => {
+                document.getElementById('visualEditorModal').classList.add('hidden');
+                gen.editData = null;
+            },
+
+            saveVisualEditor: () => {
+                gen.currentData = gen.editData;
+                gen.updateDisplay(); 
+                gen.closeVisualEditor();
+                showToast("Links atualizados!", "success");
+            },
+
+            updateEditData: (type, index, field, element, season, ep) => {
+                const val = element.value;
+                if (type === 'movie') {
+                    gen.editData.streams[index][field] = val;
+                } else {
+                    gen.editData.streams[season][ep][index][field] = val;
+                }
+            },
+
+            removeEditData: (type, index, season, ep) => {
+                if (type === 'movie') {
+                    gen.editData.streams.splice(index, 1);
+                } else {
+                    gen.editData.streams[season][ep].splice(index, 1);
+                    if (gen.editData.streams[season][ep].length === 0) {
+                        delete gen.editData.streams[season][ep];
+                    }
+                    if (Object.keys(gen.editData.streams[season]).length === 0) {
+                        delete gen.editData.streams[season];
+                    }
+                }
+                gen.renderVisualEditorContent();
+            },
+
+            renderVisualEditorContent: () => {
+                const container = document.getElementById('visualEditorContent');
+                let html = '';
+
+                if (gen.editData.type === 'movie') {
+                    if (!gen.editData.streams || gen.editData.streams.length === 0) {
+                        html = '<p class="text-zinc-600 text-center text-sm py-6">Nenhum link encontrado.</p>';
+                    } else {
+                        gen.editData.streams.forEach((stream, index) => {
+                            html += `
+                            <div class="bg-zinc-900 p-3.5 rounded-xl border border-zinc-800 flex flex-col md:flex-row gap-3 items-center group">
+                                <div class="bg-zinc-950 text-zinc-500 w-10 h-10 rounded-lg flex justify-center items-center shrink-0 border border-zinc-800"><i class="fa-solid fa-film text-xs"></i></div>
+                                <div class="flex-grow flex flex-col md:flex-row gap-3 w-full">
+                                    <textarea rows="2" class="input-unified p-2.5 text-xs rounded-lg w-full md:w-1/3 custom-scrollbar" placeholder="Nome" onchange="gen.updateEditData('movie', ${index}, 'name', this)">${escapeHTML(stream.name)}</textarea>
+                                    <input type="text" class="input-unified p-2.5 text-xs rounded-lg font-mono w-full md:w-2/3" placeholder="URL" value="${escapeHTML(stream.url)}" onchange="gen.updateEditData('movie', ${index}, 'url', this)">
+                                </div>
+                                <button onclick="gen.removeEditData('movie', ${index})" class="bg-zinc-950 border border-zinc-800 hover:border-red-900 hover:bg-red-950 text-zinc-500 hover:text-red-400 w-full md:w-10 h-10 rounded-lg transition shrink-0"><i class="fa-solid fa-trash text-xs"></i></button>
+                            </div>`;
+                        });
+                    }
+                } else {
+                    let hasItems = false;
+                    const seasons = Object.keys(gen.editData.streams || {}).sort((a,b) => parseInt(a)-parseInt(b));
+                    
+                    seasons.forEach(season => {
+                        const eps = Object.keys(gen.editData.streams[season]).sort((a,b) => parseInt(a)-parseInt(b));
+                        
+                        html += `<div class="mt-6 mb-3 px-1"><span class="text-zinc-400 text-xs font-semibold uppercase tracking-wider">Temporada ${season}</span></div>`;
+                        
+                        eps.forEach(ep => {
+                            gen.editData.streams[season][ep].forEach((stream, index) => {
+                                hasItems = true;
+                                html += `
+                                <div class="bg-zinc-900 p-3.5 rounded-xl border border-zinc-800 flex flex-col md:flex-row gap-3 items-center group">
+                                    <div class="bg-zinc-950 text-zinc-400 border border-zinc-800 font-mono font-medium w-10 h-10 rounded-lg flex justify-center items-center text-xs shrink-0">E${ep.padStart(2,'0')}</div>
+                                    <div class="flex-grow flex flex-col md:flex-row gap-3 w-full">
+                                        <textarea rows="2" class="input-unified p-2.5 text-xs rounded-lg w-full md:w-1/3 custom-scrollbar" placeholder="Nome" onchange="gen.updateEditData('series', ${index}, 'name', this, '${season}', '${ep}')">${escapeHTML(stream.name)}</textarea>
+                                        <input type="text" class="input-unified p-2.5 text-xs rounded-lg font-mono w-full md:w-2/3" placeholder="URL" value="${escapeHTML(stream.url)}" onchange="gen.updateEditData('series', ${index}, 'url', this, '${season}', '${ep}')">
+                                    </div>
+                                    <button onclick="gen.removeEditData('series', ${index}, '${season}', '${ep}')" class="bg-zinc-950 border border-zinc-800 hover:border-red-900 hover:bg-red-950 text-zinc-500 hover:text-red-400 w-full md:w-10 h-10 rounded-lg transition shrink-0"><i class="fa-solid fa-trash text-xs"></i></button>
+                                </div>`;
+                            });
+                        });
+                    });
+
+                    if (!hasItems) {
+                        html = '<p class="text-zinc-600 text-center text-sm py-6">Nenhum episódio encontrado.</p>';
+                    }
+                }
+
+                container.innerHTML = html;
+            }
+        };
+        gen.init();
+
+        // --- MÓDULO 2: CATÁLOGO ---
+        const cat = {
+            allItems: [],
+            filteredItems: [],
+            currentSort: 'newest',
+            
+            init: async () => {
+                cat.setLoading(true);
+                cat.allItems = [];
+                document.getElementById('gridContainer').innerHTML = '';
+
+                try {
+                    const response = await fetch('/api/catalog');
+                    if (!response.ok) throw new Error("Falha na API");
+                    const data = await response.json();
+
+                    cat.allItems = data.map((item, index) => {
+                        item.loaded = true;
+                        item.recentOrder = typeof item.orderIndex !== 'undefined' ? item.orderIndex : 999999;
+                        item.seriesData = { totalExpected: 0, foundCount: 0, missing: 0, percent: 0, foundSet: new Set(), seasonMap: {} };
+                        
+                        if (item.type === 'series') {
+                            if (item.cinemetaVideos) {
+                                let expectedReal = 0; 
+                                item.cinemetaVideos.forEach(v => {
+                                    if (v.season > 0) { 
+                                        expectedReal++;
+                                        if(!item.seriesData.seasonMap[v.season]) item.seriesData.seasonMap[v.season] = { found: 0, expected: 0 };
+                                        item.seriesData.seasonMap[v.season].expected++;
+                                    }
+                                });
+                                item.seriesData.totalExpected = expectedReal; 
+                            }   
+
+                            const newStreams = [];
+                            const foundIds = new Set();
+                            
+                            if (item.streams && !Array.isArray(item.streams)) {
+                                Object.keys(item.streams).forEach(seasonNum => {
+                                    const seasonObj = item.streams[seasonNum];
+                                    if(!item.seriesData.seasonMap[seasonNum]) item.seriesData.seasonMap[seasonNum] = { found: 0, expected: 0 };
+                                    item.seriesData.seasonMap[seasonNum].found = Object.keys(seasonObj).length;
+
+                                    Object.keys(seasonObj).forEach(epNum => {
+                                        const sources = seasonObj[epNum];
+                                        if (sources && sources.length > 0) {
+                                            const s = seasonNum.padStart(2, '0');
+                                            const e = epNum.padStart(2, '0');
+                                            const epId = `S${s}E${e}`;
+                                            
+                                            sources.forEach((source, index) => {
+                                                const linkName = source.name || source.description || `Opção ${index + 1}`;
+                                                newStreams.push({ name: `${epId} - ${linkName}`, url: source.url });
+                                            });
+                                            foundIds.add(epId);
+                                        }
+                                    });
+                                });
+                            }
+                            item.streams = newStreams;
+                            item.seriesData.foundSet = foundIds;
+                            item.seriesData.foundCount = foundIds.size;
+                            const total = item.seriesData.totalExpected;
+                            const found = item.seriesData.foundCount;
+                            item.seriesData.missing = Math.max(0, total - found);
+                            item.seriesData.percent = total > 0 ? Math.round((found / total) * 100) : 0;
+                        } else {
+                            if (!item.streams) item.streams = [];
+                        }
+
+                        return item;
+                    });
+
+                    cat.updateGlobalStats();
+                    cat.filter('all');
+
+                } catch (error) {
+                    showToast("Erro ao carregar o catálogo", "error");
+                } finally {
+                    cat.setLoading(false);
+                }
+            },
+
+            search: (query) => {
+                const term = query.toLowerCase();
+                if (!term) { cat.filter('all'); return; }
+                cat.filteredItems = cat.allItems.filter(item => 
+                    (item.title && item.title.toLowerCase().includes(term)) || 
+                    (item.id && item.id.includes(term))
+                );
+                cat.sort(cat.currentSort);
+            },
+
+            sort: (mode) => {
+                cat.currentSort = mode;
+                if (mode === 'newest') cat.filteredItems.sort((a, b) => a.recentOrder - b.recentOrder);
+                else if (mode === 'oldest') cat.filteredItems.sort((a, b) => b.recentOrder - a.recentOrder);
+                else if (mode === 'year') cat.filteredItems.sort((a, b) => { const yA = parseInt(a.year) || 0; const yB = parseInt(b.year) || 0; return yB - yA; });
+                else if (mode === 'name') cat.filteredItems.sort((a, b) => (a.title||a.id).localeCompare(b.title||b.id));
+                cat.renderFiltered();
+            },
+
+            editInGenerator: (id) => {
+                const item = cat.allItems.find(i => i.id === id);
+                if (!item) return;
+
+                let exportData = {
+                    id: item.id,
+                    type: item.type,
+                    streams: item.type === 'series' ? {} : JSON.parse(JSON.stringify(item.streams || []))
+                };
+
+                if (item.type === 'series' && Array.isArray(item.streams)) {
+                    item.streams.forEach(str => {
+                        const match = str.name.match(/S(\d+)E(\d+)/i);
+                        if (match) {
+                            const s = parseInt(match[1]).toString();
+                            const e = parseInt(match[2]).toString();
+                            if(!exportData.streams[s]) exportData.streams[s] = {};
+                            if(!exportData.streams[s][e]) exportData.streams[s][e] = [];
+                            
+                            let nomeLimpo = str.name.replace(/S\d+E\d+\s*(-\s*)?/i, '').trim();
+                            exportData.streams[s][e].push({ name: nomeLimpo, url: str.url });
+                        }
+                    });
+                }
+
+                gen.currentData = exportData;
+                document.getElementById('contentId').value = exportData.id;
+                document.getElementById('seriesName').value = item.title || '';
+                
+                const typeRadio = document.querySelector(`input[name="contentType"][value="${exportData.type}"]`);
+                if(typeRadio) typeRadio.checked = true;
+                
+                gen.toggleInputs();
+                gen.updateDisplay(true);
+                switchView('generator');
+                showToast(`Pronto para editar: ${item.title || item.id}`);
+            },
+
+            downloadJson: (id) => {
+                const item = cat.allItems.find(i => i.id === id);
+                if (!item) return;
+
+                let exportData = {
+                    id: item.id,
+                    type: item.type,
+                    streams: item.type === 'series' ? {} : (item.streams || [])
+                };
+
+                if (item.type === 'series' && Array.isArray(item.streams)) {
+                    item.streams.forEach(str => {
+                        const match = str.name.match(/S(\d+)E(\d+)/i);
+                        if (match) {
+                            const s = parseInt(match[1]).toString();
+                            const e = parseInt(match[2]).toString();
+                            if(!exportData.streams[s]) exportData.streams[s] = {};
+                            if(!exportData.streams[s][e]) exportData.streams[s][e] = [];
+                            
+                            let nomeLimpo = str.name.replace(/S\d+E\d+\s*(-\s*)?/i, '').trim();
+                            
+                            exportData.streams[s][e].push({ name: nomeLimpo, url: str.url });
+                        }
+                    });
+                }
+
+                const blob = new Blob([JSON.stringify(exportData, null, 4)], { type: 'application/json' });
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = `${item.title ? item.title.replace(/[^a-z0-9]/gi, '_').toLowerCase() : item.id}.json`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            },
+
+            deleteItem: async (id) => {
+                if(!confirm(`Remover ${id}? \nIsso remove visualmente até o servidor atualizar.`)) return;
+
+                try {
+                    await fetch('/api/delete', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ id: id })
+                    });
+                    
+                    cat.allItems = cat.allItems.filter(i => i.id !== id);
+                    
+                    const btnMissing = document.getElementById('btn-missing_all');
+                    const currentFilterIsMissing = btnMissing && btnMissing.classList.contains('bg-white');
+                    
+                    if (currentFilterIsMissing) cat.filter('missing_all');
+                    else cat.filter('all');
+                    
+                    cat.updateGlobalStats();
+                    showToast(`${id} removido!`, 'success');
+                } catch(e) { showToast('Erro', 'error'); }
+            },
+
+            renderCard: (item) => {
+                const posterHtml = item.poster ? `<img src="${item.poster}" alt="${item.title}" loading="lazy" class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105 opacity-90 group-hover:opacity-100">` : `<div class="flex flex-col items-center justify-center h-full bg-zinc-900 text-zinc-700"><i class="fa-solid fa-image text-3xl mb-2"></i><span class="text-[10px]">${item.id}</span></div>`;
+
+                let footerHtml = '';
+                if (item.type === 'series') {
+                    const { foundCount, totalExpected, missing, percent } = item.seriesData;
+                    let barColor = 'bg-zinc-500';
+                    let statusText = `<span class="text-zinc-500">Analizando</span>`;
+
+                    if (item.loaded) {
+                        if (missing === 0 && totalExpected > 0) { barColor = 'bg-emerald-500'; statusText = `<span class="text-emerald-500 font-semibold text-[10px]">Completo</span>`; } 
+                        else if (totalExpected > 0) { barColor = 'bg-amber-500'; statusText = `<span class="text-amber-500 font-semibold text-[10px]">Faltam ${missing}</span>`; } 
+                        else { statusText = `<span class="text-zinc-400 font-semibold text-[10px]">${foundCount} eps</span>`; }
+                    }
+                    footerHtml = `<div class="mt-2.5"><div class="flex justify-between items-end mb-1.5">${statusText}<span class="text-zinc-500 text-[10px] font-mono">${foundCount}/${totalExpected || '?'}</span></div><div class="h-1 w-full bg-zinc-800 rounded-full overflow-hidden"><div class="h-full ${barColor} progress-fill" style="width: ${item.loaded ? percent : 5}%"></div></div></div>`;
+                } else {
+                    const streamCount = item.streams ? item.streams.length : 0;
+                    const hasLink = streamCount > 0;
+                    footerHtml = `<div class="mt-auto pt-2.5 flex justify-between items-center"><span class="text-[10px] text-zinc-500 font-mono">${item.year || ''}</span><span class="${hasLink ? 'text-zinc-300' : 'text-red-400'} text-[10px] font-medium flex items-center gap-1.5">${hasLink ? streamCount + ' opções' : 'Sem links'}</span></div>`;
+                }
+
+                return `
+                <div class="group bg-zinc-900 rounded-2xl overflow-hidden border border-zinc-800 hover:border-zinc-700 transition-all flex flex-col h-full cursor-pointer relative">
+                    <div class="absolute top-2 left-2 flex flex-col gap-1.5 z-30 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button onclick="event.stopPropagation(); cat.editInGenerator('${item.id}')" class="bg-zinc-900/90 text-zinc-300 hover:text-white p-2 rounded-lg backdrop-blur-md border border-zinc-700/50 transition"><i class="fa-solid fa-pen text-[10px]"></i></button>
+                        <button onclick="event.stopPropagation(); cat.downloadJson('${item.id}')" class="bg-zinc-900/90 text-zinc-300 hover:text-white p-2 rounded-lg backdrop-blur-md border border-zinc-700/50 transition"><i class="fa-solid fa-download text-[10px]"></i></button>
+                        <button onclick="event.stopPropagation(); cat.deleteItem('${item.id}')" class="bg-zinc-900/90 text-red-400 hover:text-red-300 p-2 rounded-lg backdrop-blur-md border border-zinc-700/50 transition"><i class="fa-solid fa-trash text-[10px]"></i></button>
+                    </div>
+                    <div class="aspect-[2/3] bg-zinc-950 relative overflow-hidden" onclick="cat.openLinks('${item.id}')">
+                        ${posterHtml}
+                    </div>
+                    <div class="p-3.5 flex flex-col flex-grow bg-zinc-900" onclick="cat.openLinks('${item.id}')">
+                        <h3 class="font-medium text-zinc-200 leading-snug mb-1 line-clamp-2 text-xs" title="${item.title}">${item.title}</h3>
+                        ${footerHtml}
+                    </div>
+                </div>`;
+            },
+
+            filter: (type) => {
+                // Remove estilos ativos de todos
+                document.querySelectorAll('.filter-btn').forEach(b => {
+                    b.classList.remove('bg-white', 'text-zinc-900', 'shadow-sm');
+                    b.classList.add('bg-zinc-900', 'border-zinc-800');
+                    if (b.id === 'btn-missing_all') {
+                        b.classList.add('text-amber-500'); // mantém laranjinha se inativo
+                    } else {
+                        b.classList.add('text-zinc-400');
+                    }
+                });
+
+                // Adiciona o estilo ativo no selecionado
+                const activeBtn = document.getElementById(`btn-${type}`);
+                if(activeBtn) {
+                    activeBtn.classList.remove('bg-zinc-900', 'text-zinc-400', 'text-amber-500');
+                    activeBtn.classList.add('bg-white', 'text-zinc-900', 'shadow-sm');
+                }
+
+                if (type === 'all') {
+                    cat.filteredItems = [...cat.allItems]; 
+                } else if (type === 'missing_all') {
+                    cat.filteredItems = cat.allItems.filter(i => {
+                        if (i.type === 'movie') return !i.streams || i.streams.length === 0;
+                        if (i.type === 'series') return i.seriesData.missing > 0;
+                        return false;
+                    });
+                } else {
+                    cat.filteredItems = cat.allItems.filter(i => i.type === type);
+                }
+
+                cat.sort(cat.currentSort);
+            },
+
+            renderFiltered: () => {
+                const container = document.getElementById('gridContainer');
+                if(!cat.filteredItems.length) { container.innerHTML = '<div class="col-span-full text-center text-zinc-600 py-12 text-sm">Nenhum resultado.</div>'; return; }
+                container.innerHTML = cat.filteredItems.map(item => cat.renderCard(item)).join('');
+            },
+
+            updateGlobalStats: () => {
+                document.getElementById('countMovies').innerText = cat.allItems.filter(i => i.type === 'movie').length;
+                document.getElementById('countSeries').innerText = cat.allItems.filter(i => i.type === 'series').length;
+                
+                let totalEpsPossuidos = 0, totalFaltantes = 0;
+                cat.allItems.forEach(i => {
+                    if(i.type === 'series') { totalEpsPossuidos += i.seriesData.foundCount; totalFaltantes += i.seriesData.missing; }
+                    if(i.type === 'movie') { if(!i.streams || i.streams.length === 0) totalFaltantes++; }
+                });
+
+                document.getElementById('countTotalEps').innerText = totalEpsPossuidos;
+                const missEl = document.getElementById('countMissing');
+                missEl.innerText = totalFaltantes;
+            },
+
+            setLoading: (isLoading) => {
+                const el = document.getElementById('apiStatus');
+                if(!el) return;
+                if (isLoading) el.innerHTML = '<span class="loader w-3 h-3"></span>';
+                else el.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Conectado`;
+            },
+
+            openLinks: (id) => {
+                const item = cat.allItems.find(i => i.id === id);
+                if (!item) return;
+                
+                document.getElementById('modalTitle').innerText = item.title || item.id;
+                
+                document.getElementById('btnModalEdit').onclick = () => {
+                    cat.closeModal();
+                    cat.editInGenerator(item.id);
+                };
+
+                const statsEl = document.getElementById('modalStats');
+                const content = document.getElementById('modalContent');
+                content.innerHTML = '';
+
+                if (item.type === 'series') {
+                    const { foundCount, totalExpected, missing } = item.seriesData;
+                    statsEl.innerHTML = `<span class="text-zinc-400">Disponível: <b class="text-white">${foundCount}</b> / ${totalExpected || '?'}</span>${missing > 0 ? `<span class="text-amber-500 ml-3">Faltam ${missing}</span>` : `<span class="text-emerald-500 ml-3">Completo</span>`}`;
+                    
+                    if (item.seriesData.seasonMap && Object.keys(item.seriesData.seasonMap).length > 0) {
+                        const seasonsContainer = document.createElement('div');
+                        seasonsContainer.className = "flex flex-wrap gap-2 mb-6";
+                        Object.keys(item.seriesData.seasonMap).sort((a,b) => parseInt(a)-parseInt(b)).forEach(s => {
+                            const data = item.seriesData.seasonMap[s];
+                            const isComplete = data.found >= data.expected && data.expected > 0;
+                            if (s == "0" && data.expected === 0) return;
+                            seasonsContainer.innerHTML += `<div class="bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-center flex flex-col min-w-[70px]"><span class="text-[9px] uppercase tracking-wider text-zinc-500 font-semibold mb-1">T${s}</span><span class="font-mono text-xs ${isComplete ? 'text-emerald-400' : 'text-zinc-300'}">${data.found}/${data.expected || '?'}</span></div>`;
+                        });
+                        content.appendChild(seasonsContainer);
+                    }
+                } else { statsEl.innerHTML = `<span class="text-zinc-500">${item.year || ''} • Filme</span>`; }
+
+                if (!item.streams || item.streams.length === 0) {
+                    content.innerHTML = '<div class="text-zinc-600 text-center py-10 text-sm">Nenhum link encontrado.</div>';
+                } else {
+                    let displayStreams = [...item.streams];
+                    if(item.type === 'series') displayStreams.sort((a,b) => (a.name || "").localeCompare(b.name || "", undefined, {numeric: true, sensitivity: 'base'}));
+                    
+                    const gridLinks = document.createElement('div');
+                    gridLinks.className = "space-y-2";
+
+                    displayStreams.forEach(stream => {
+                        const name = stream.name || "Link"; const url = stream.url || "#";
+                        const epMatch = name.match(/S\d+E\d+|(\d+)x(\d+)/i);
+                        const highlight = epMatch ? `<span class="text-zinc-500 text-[10px] font-mono mr-3 uppercase">${epMatch[0]}</span>` : "";
+                        const linkEl = document.createElement('div');
+                        linkEl.className = "bg-zinc-900 hover:bg-zinc-800 p-3.5 rounded-xl border border-zinc-800 flex justify-between items-center transition-colors cursor-pointer group";
+                        linkEl.innerHTML = `<div class="flex items-center overflow-hidden"><div class="flex flex-col overflow-hidden"><div class="flex items-center">${highlight}<span class="text-xs font-medium text-zinc-300 truncate group-hover:text-white">${name.replace(epMatch ? epMatch[0] : '', '').trim() || name}</span></div></div></div><div class="text-zinc-600 group-hover:text-zinc-300 pl-4"><i class="fa-regular fa-copy text-sm"></i></div>`;
+                        linkEl.onclick = () => { 
+                            navigator.clipboard.writeText(url); 
+                            const icon = linkEl.querySelector('.fa-copy'); 
+                            icon.classList.replace('fa-copy', 'fa-check'); 
+                            icon.classList.add('text-emerald-400');
+                            setTimeout(() => { 
+                                icon.classList.replace('fa-check', 'fa-copy'); 
+                                icon.classList.remove('text-emerald-400');
+                            }, 1000); 
+                        };
+                        gridLinks.appendChild(linkEl);
+                    });
+                    content.appendChild(gridLinks);
+                }
+                document.getElementById('modalTotalLinks').innerText = `${item.streams ? item.streams.length : 0} links`;
+                document.getElementById('linkModal').classList.remove('hidden');
+            },
+            closeModal: () => { document.getElementById('linkModal').classList.add('hidden'); }
+        };
+
+        // --- MÓDULO 3: PROCESSADOR DE PEDIDOS ---
+        const reqProcessor = {
+            parsedItems: new Map(),
+            totalLinesRead: 0,
+            tmdbKey: "eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJlZTBmMzJmNzY5Mzc0YTkzYTI0ZmNiYzcyMWRlODYzNCIsIm5iZiI6MTc1NjA2MzM2NC4yMzksInN1YiI6IjY4YWI2Njg0ZDAyMjdhYTVlMjlkYjE2MSIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.z1hG61Z5RCvn6qEZj60sHxrDZ0hR8QQi4rt18erzF-w",
+
+            clearData: () => {
+                reqProcessor.parsedItems.clear();
+                reqProcessor.totalLinesRead = 0;
+                
+                reqProcessor.updateUI();
+                document.getElementById('req-results-container').innerHTML = `<div class="text-center py-12 text-zinc-600"><p class="text-sm font-medium">Memória limpa.</p></div>`;
+                document.getElementById('btn-download-json').classList.add('hidden');
+                document.getElementById('btn-download-txt').classList.add('hidden');
+                document.getElementById('btn-download-csv')?.classList.add('hidden');
+                document.getElementById('req-search-row')?.classList.add('hidden');
+                document.getElementById('req-loading-status').innerText = `Pronto`;
+                showToast("Lista limpa");
+            },
+
+            handleUpload: (input) => {
+                const file = input.files[0];
+                if (!file) return;
+
+                document.getElementById('req-loading-status').innerHTML = `<span class="loader inline-block w-3 h-3 mr-2 border-zinc-500 border-t-zinc-300"></span> Lendo TXT`;
+                
+                const reader = new FileReader();
+                reader.onload = async (e) => {
+                    const text = e.target.result;
+                    const lines = text.split('\n');
+                    let newItemsAdded = 0;
+                    
+                    for (const line of lines) {
+                        if (line.trim() === '') continue;
+                        reqProcessor.totalLinesRead++;
+                        
+                        const match = line.match(/(movie|series):\s*(tt\d+)(?:\s*\((.*?)\))?/);
+                        if (match) {
+                            const type = match[1];
+                            const imdbId = match[2];
+                            const epInfo = match[3];
+
+                            if (!reqProcessor.parsedItems.has(imdbId)) {
+                                reqProcessor.parsedItems.set(imdbId, {
+                                    id: imdbId,
+                                    type: type,
+                                    title: "Buscando...",
+                                    missingEps: new Set(),
+                                    count: 0
+                                });
+                                newItemsAdded++;
+                            }
+
+                            const cur = reqProcessor.parsedItems.get(imdbId);
+                            cur.count = (cur.count || 0) + 1;
+
+                            if (type === 'series' && epInfo) {
+                                cur.missingEps.add(epInfo);
+                            }
+                        }
+                    }
+
+                    reqProcessor.updateUI();
+                    
+                    if (newItemsAdded > 0 || Array.from(reqProcessor.parsedItems.values()).some(i => i.title === "Buscando...")) {
+                        reqProcessor.fetchTitlesFromTMDB(); 
+                    } else {
+                        document.getElementById('req-loading-status').innerText = `Atualizado`;
+                        document.getElementById('btn-download-json').classList.remove('hidden');
+                        document.getElementById('btn-download-txt').classList.remove('hidden');
+                        document.getElementById('btn-download-csv')?.classList.remove('hidden');
+                    }
+                    
+                    reqProcessor.renderList();
+                    input.value = ""; 
+                };
+                reader.readAsText(file);
+            },
+
+            handleJsonUpload: (input) => {
+                const file = input.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const data = JSON.parse(e.target.result);
+                        reqProcessor.totalLinesRead = data.totalLidos || 0;
+                        
+                        reqProcessor.parsedItems.clear();
+                        if (data.items) {
+                            data.items.forEach(item => {
+                                reqProcessor.parsedItems.set(item.id, {
+                                    id: item.id,
+                                    type: item.type,
+                                    title: item.title,
+                                    missingEps: new Set(item.missingEps || []) 
+                                });
+                            });
+                        }
+                        
+                        reqProcessor.updateUI();
+                        reqProcessor.renderList();
+                        
+                        if(reqProcessor.parsedItems.size > 0) {
+                             document.getElementById('btn-download-json').classList.remove('hidden');
+                             document.getElementById('btn-download-txt').classList.remove('hidden');
+                             document.getElementById('btn-download-csv')?.classList.remove('hidden');
+                             document.getElementById('req-loading-status').innerText = `Restaurado`;
+                        }
+                    } catch (err) {
+                        showToast("JSON inválido", "error");
+                    }
+                };
+                reader.readAsText(file);
+                input.value = "";
+            },
+
+            fetchTitlesFromTMDB: async () => {
+                const statusEl = document.getElementById('req-loading-status');
+                const itemsToFetch = Array.from(reqProcessor.parsedItems.values()).filter(i => i.title === "Buscando..." || i.title === "Erro");
+                const total = itemsToFetch.length;
+                
+                if (total === 0) return;
+
+                let count = 0;
+                for (const item of itemsToFetch) {
+                    const pct = Math.round((count / total) * 100);
+                    statusEl.innerHTML = `<span class="loader inline-block w-3 h-3 mr-2 border-zinc-500 border-t-zinc-300"></span> TMDB: ${pct}%`;
+
+                    try {
+                        const res = await fetch(`https://api.themoviedb.org/3/find/${item.id}?api_key=${reqProcessor.tmdbKey}&external_source=imdb_id&language=pt-BR`);
+                        if(res.ok) {
+                            const data = await res.json();
+                            if (item.type === 'movie' && data.movie_results.length > 0) {
+                                item.title = data.movie_results[0].title;
+                            } else if (item.type === 'series' && data.tv_results.length > 0) {
+                                item.title = data.tv_results[0].name;
+                            } else {
+                                item.title = "Título desconhecido";
+                            }
+                        }
+                    } catch(e) {
+                        item.title = "Erro";
+                    }
+                    count++;
+                }
+                
+                statusEl.innerText = `100% Concluído`;
+                document.getElementById('btn-download-json').classList.remove('hidden');
+                document.getElementById('btn-download-txt').classList.remove('hidden');
+                document.getElementById('btn-download-csv')?.classList.remove('hidden');
+                reqProcessor.renderList(); 
+            },
+
+            updateUI: () => {
+                document.getElementById('req-total-lines').innerText = reqProcessor.totalLinesRead;
+                
+                let movies = 0; let series = 0; let totalRequests = 0;
+                reqProcessor.parsedItems.forEach(item => {
+                    if(item.type === 'movie') movies++;
+                    if(item.type === 'series') series++;
+                    totalRequests += (item.count || 1);
+                });
+
+                document.getElementById('req-movies-count').innerText = movies;
+                document.getElementById('req-series-count').innerText = series;
+                const totalEl = document.getElementById('req-total-requests');
+                if(totalEl) totalEl.innerText = totalRequests.toLocaleString('pt-BR');
+
+                if(reqProcessor.parsedItems.size > 0) {
+                    const searchRow = document.getElementById('req-search-row');
+                    if(searchRow) searchRow.classList.remove('hidden');
+                }
+            },
+
+            renderList: () => {
+                const container = document.getElementById('req-results-container');
+                if (reqProcessor.parsedItems.size === 0) return;
+
+                const busca = (document.getElementById('req-search')?.value || '').toLowerCase();
+                const sortMode = document.getElementById('req-sort')?.value || 'count';
+                const filterType = document.getElementById('req-filter-type')?.value || 'all';
+
+                let items = Array.from(reqProcessor.parsedItems.values())
+                    .filter(item => filterType === 'all' || item.type === filterType)
+                    .filter(item => !busca || item.id.toLowerCase().includes(busca) || (item.title||'').toLowerCase().includes(busca));
+
+                if (sortMode === 'count') items.sort((a,b) => (b.count||0) - (a.count||0));
+                else if (sortMode === 'alpha') items.sort((a,b) => (a.title||a.id).localeCompare(b.title||b.id));
+                else if (sortMode === 'type') items.sort((a,b) => a.type.localeCompare(b.type) || (b.count||0) - (a.count||0));
+
+                let html = '';
+                items.forEach(item => {
+                    const typeName = item.type === 'movie' ? 'Filme' : 'Série';
+                    const countBadge = (item.count > 1) ? `<span class="text-zinc-500 text-[10px] font-medium ml-2">${item.count} pedidos</span>` : '';
+
+                    let epsHtml = '';
+                    if (item.type === 'series' && item.missingEps.size > 0) {
+                        const epsArray = Array.from(item.missingEps).sort((a, b) => {
+                            const pa = a.match(/(\d+)/g)?.map(Number) || [0,0];
+                            const pb = b.match(/(\d+)/g)?.map(Number) || [0,0];
+                            return pa[0] !== pb[0] ? pa[0] - pb[0] : (pa[1]||0) - (pb[1]||0);
+                        });
+                        const epTags = epsArray.map(ep => `<span class="bg-zinc-900 border border-zinc-800 text-zinc-400 rounded-md px-2 py-1 text-[10px] font-mono">${ep}</span>`).join('');
+                        epsHtml = `<div class="mt-3 flex flex-wrap gap-1.5">${epTags}</div>`;
+                    }
+
+                    html += `
+                        <div class="bg-zinc-950 p-4 rounded-xl border border-zinc-900 flex flex-col group">
+                            <div class="flex items-center justify-between">
+                                <div class="overflow-hidden">
+                                    <div class="flex items-center gap-2">
+                                        <h4 class="font-medium text-white text-sm truncate">${item.title}</h4>
+                                        <span class="text-[9px] text-zinc-500 uppercase tracking-widest border border-zinc-800 px-1.5 rounded">${typeName}</span>
+                                    </div>
+                                    <div class="flex items-center mt-1">
+                                        <span class="font-mono text-[10px] text-zinc-600">${item.id}</span>
+                                        ${countBadge}
+                                    </div>
+                                </div>
+                                <button onclick="reqProcessor.removeItem('${item.id}')" class="text-zinc-700 hover:text-red-400 transition p-2"><i class="fa-solid fa-xmark"></i></button>
+                            </div>
+                            ${epsHtml}
+                        </div>
+                    `;
+                });
+
+                container.innerHTML = html || '<div class="text-center py-8 text-zinc-600 text-sm">Nenhum resultado.</div>';
+            },
+
+            removeItem: (id) => {
+                if(reqProcessor.parsedItems.has(id)) {
+                    reqProcessor.parsedItems.delete(id);
+                    reqProcessor.updateUI();
+                    reqProcessor.renderList();
+                    if(reqProcessor.parsedItems.size === 0) reqProcessor.clearData();
+                }
+            },
+
+            downloadTxt: () => {
+                if (reqProcessor.parsedItems.size === 0) return;
+                let txtContent = "=== RELATÓRIO DE PEDIDOS/AUSENTES ===\n\n";
+                const movies = []; const series = [];
+                reqProcessor.parsedItems.forEach(item => {
+                    if(item.type === 'movie') movies.push(item);
+                    else series.push(item);
+                });
+
+                if (movies.length > 0) {
+                    txtContent += "🎬 FILMES\n";
+                    movies.forEach((m, idx) => { txtContent += `${m.id} - ${m.title}\n`; });
+                    txtContent += "\n";
+                }
+
+                if (series.length > 0) {
+                    txtContent += "📺 SÉRIES\n";
+                    series.forEach((s, idx) => {
+                        txtContent += `${s.id} - ${s.title}\n`;
+                        if (s.missingEps.size > 0) {
+                            Array.from(s.missingEps).forEach(ep => { txtContent += `   -> ${ep}\n`; });
+                        }
+                    });
+                }
+
+                const blob = new Blob([txtContent], { type: 'text/plain;charset=utf-8' });
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                const data = new Date();
+                a.download = `ausentes_${data.getDate()}-${data.getMonth()+1}.txt`;
+                document.body.appendChild(a); a.click(); document.body.removeChild(a);
+            },
+
+            downloadCsv: () => {
+                if (reqProcessor.parsedItems.size === 0) return;
+                const items = Array.from(reqProcessor.parsedItems.values()).sort((a,b) => (b.count||0) - (a.count||0));
+                const linhas = [['ID','Tipo','Título','Pedidos','Episódios Faltantes']];
+                items.forEach(item => {
+                    const eps = Array.from(item.missingEps).sort().join(' | ');
+                    linhas.push([item.id, item.type === 'movie' ? 'Filme' : 'Série', item.title, item.count || 1, eps]);
+                });
+                const csv = linhas.map(l => l.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('');
+                const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                const d = new Date(); a.download = `ausentes_${d.getDate()}-${d.getMonth()+1}.csv`;
+                document.body.appendChild(a); a.click(); document.body.removeChild(a);
+            },
+
+            downloadJson: () => {
+                if (reqProcessor.parsedItems.size === 0) return;
+                const jsonContent = JSON.stringify({
+                    totalLidos: reqProcessor.totalLinesRead,
+                    items: Array.from(reqProcessor.parsedItems.values()).map(i => ({...i, missingEps: Array.from(i.missingEps)}))
+                }, null, 4);
+                const blob = new Blob([jsonContent], { type: 'application/json' });
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                const data = new Date();
+                a.download = `progresso_ausentes_${data.getDate()}-${data.getMonth()+1}.json`;
+                document.body.appendChild(a); a.click(); document.body.removeChild(a);
+            }
+        };
+
     </script>
 </body>
 </html>
