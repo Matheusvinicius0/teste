@@ -386,11 +386,15 @@
                 localStorage.removeItem('fenixflix_senha'); // Remove a senha ao sair
                 showToast("Modo visualizador ativado", "info");
             } else {
-                const pass = prompt("Palavra-passe de Administrador do Banco de Dados:");
-                if (pass) { // Guarda a senha real que digitares
+                // ⚠️ AVISO DE SEGURANÇA: A senha foi colocada diretamente no código.
+                // Qualquer pessoa pode ver esta senha se inspecionar a página (F12).
+                // Use com extrema cautela, apenas se o site for privado!
+                const pass = "ajzjJBDJwlDvE5RrQAXMOW8eq0jdQs3O";
+                
+                if (pass) { // Guarda a senha fixa
                     localStorage.setItem('fenixflix_admin', 'true');
                     localStorage.setItem('fenixflix_senha', pass);
-                    showToast("Modo Admin ativado!", "success");
+                    showToast("Modo Admin ativado automaticamente!", "success");
                 }
             }
             checkAdmin();
