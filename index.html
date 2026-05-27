@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+!DOCTYPE html>
 <html lang="pt-PT">
 <head>
     <meta charset="UTF-8">
@@ -7,11 +7,7 @@
     
     <link rel="icon" href="data:image/svg+xml,&lt;svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'&gt;&lt;path fill='%23facc15' d='M511.6 36.86l-64 415.1c-1.5 9.734-7.375 18.22-15.97 23.05c-4.844 2.719-10.27 4.097-15.68 4.097c-4.188 0-8.319-812-12.29-2.472l-122.6-69.66l-122.6 69.66c-3.973 1.66-8.106 2.472-12.29 2.472c-5.418 0-10.84-1.378-15.68-4.097c-8.594-4.828-14.47-13.32-15.97-23.05l-64-415.1C48.59 18.4 64.14 1.375 82.99 1.375c7.95 0 15.41 3.03 20.98 8.485l152 148.9l152-148.9c5.574-5.454 13.04-8.485 20.98-8.485C447.9 1.375 463.4 18.4 460.4 36.86z'/&gt;&lt;/svg&gt;">
 
-    <!-- Tipografia Inter -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     
@@ -30,76 +26,58 @@
 
     <style>
         body { background-color: #09090b; color: #e4e4e7; }
-        
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #27272a; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #3f3f46; }
-
         .scrollbar-hide::-webkit-scrollbar { display: none; }
         .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
-
-        /* Inputs Minimalistas */
         .input-unified {
             background-color: #09090b;
             border: 1px solid #27272a;
             color: #f4f4f5;
             transition: all 0.2s ease;
         }
-        .input-unified:focus {
-            border-color: #6366f1;
-            box-shadow: 0 0 0 1px #6366f1;
-            outline: none;
-        }
-
-        .loader {
-            border: 2px solid #27272a;
-            border-top: 2px solid #a1a1aa;
-            border-radius: 50%;
-            width: 16px;
-            height: 16px;
-            animation: spin 1s linear infinite;
-        }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-
+        .input-unified:focus { border-color: #6366f1; box-shadow: 0 0 0 1px #6366f1; outline: none; }
         .tab-content { display: none; animation: fadeSlide 0.25s ease-out forwards; }
         .tab-content.active { display: block; }
         @keyframes fadeSlide { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
-
-        /* Botões de Navegação Ultra-Clean */
         .nav-btn.active { background-color: #fafafa; color: #09090b; border-color: #fafafa; }
         .nav-btn { background-color: transparent; color: #a1a1aa; border: 1px solid #27272a; }
-
-        @keyframes slideIn {
-            from { transform: translateY(100%) scale(0.95); opacity: 0; }
-            to { transform: translateY(0) scale(1); opacity: 1; }
-        }
+        @keyframes slideIn { from { transform: translateY(100%) scale(0.95); opacity: 0; } to { transform: translateY(0) scale(1); opacity: 1; } }
         .toast { animation: slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
         
-        .progress-fill { transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1); }
+        .admin-only { display: none; }
+        body.admin-mode .admin-only { display: flex; }
+        body.admin-mode .admin-only-block { display: block; }
     </style>
 </head>
 <body class="min-h-screen flex flex-col selection:bg-indigo-500/30">
 
-    <!-- Navbar Minimalista -->
+    <!-- Barra de Navegação -->
     <nav class="sticky top-0 z-50 bg-zinc-950/80 backdrop-blur-xl border-b border-zinc-900">
         <div class="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center overflow-x-auto scrollbar-hide">
             <div class="flex items-center gap-3 mr-6 flex-shrink-0">
                 <i class="fa-brands fa-phoenix-squadron text-white text-xl"></i>
                 <div>
-                    <h1 class="font-semibold text-base leading-tight tracking-tight text-white">FenixFlix Studio</h1>
+                    <h1 class="font-semibold text-base leading-tight tracking-tight text-white flex items-center gap-2">
+                        FenixFlix <span class="bg-zinc-800 text-zinc-300 px-2 py-0.5 rounded text-[10px] admin-only hidden">ADMIN</span>
+                    </h1>
                 </div>
             </div>
             
-            <div class="flex gap-2 flex-shrink-0">
-                <button onclick="switchView('generator')" id="btn-generator" class="nav-btn px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 hover:bg-zinc-900">
-                    <i class="fa-solid fa-code"></i> <span class="hidden sm:inline">Criar JSON</span>
-                </button>
-                <button onclick="switchView('requests')" id="btn-requests" class="nav-btn px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 hover:bg-zinc-900">
-                    <i class="fa-solid fa-list-check"></i> <span class="hidden md:inline">Pedidos</span>
-                </button>
-                <button onclick="switchView('catalog'); setTimeout(() => cat.filter('all'), 50);" id="btn-catalog" class="nav-btn active px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
+            <div class="flex gap-2 flex-shrink-0 items-center">
+                <button onclick="switchView('catalog')" id="btn-catalog" class="nav-btn active px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
                     <i class="fa-solid fa-layer-group"></i> <span class="hidden sm:inline">Catálogo</span>
+                </button>
+                <button onclick="switchView('generator')" id="btn-generator" class="nav-btn px-4 py-2 rounded-lg text-sm font-medium transition-colors items-center gap-2 hover:bg-zinc-900 admin-only">
+                    <i class="fa-solid fa-code"></i> <span class="hidden sm:inline">Criar/Editar JSON</span>
+                </button>
+                <button onclick="switchView('pedidos')" id="btn-pedidos" class="nav-btn px-4 py-2 rounded-lg text-sm font-medium transition-colors items-center gap-2 hover:bg-zinc-900">
+                    <i class="fa-solid fa-bell"></i> <span class="hidden sm:inline">Pedidos</span>
+                </button>
+                <button onclick="toggleAdmin()" id="btn-admin-toggle" class="nav-btn px-3 py-2 rounded-lg text-sm font-medium transition-colors hover:bg-zinc-900 ml-2" title="Modo Admin">
+                    <i class="fa-solid fa-lock" id="admin-icon"></i>
                 </button>
             </div>
         </div>
@@ -107,94 +85,164 @@
 
     <main class="flex-grow p-4 md:p-8 max-w-7xl mx-auto w-full">
 
-        <!-- ABA 1: GERADOR -->
+        <!-- ABA 1: CATÁLOGO (Público/Admin) -->
+        <div id="view-catalog" class="tab-content active">
+            
+            <!-- Cards de Estado (Visíveis para TODOS, sem precisar de senha) -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
+                <div class="bg-zinc-900 p-4 rounded-2xl border border-zinc-800 flex flex-col justify-center items-center shadow-lg">
+                    <p class="text-zinc-500 text-[10px] font-semibold uppercase tracking-wider mb-1">Total de Títulos</p>
+                    <p id="countTotal" class="text-2xl font-bold text-white">0</p>
+                </div>
+                <div class="bg-zinc-900 p-4 rounded-2xl border border-zinc-800 flex flex-col justify-center items-center shadow-lg">
+                    <p class="text-zinc-500 text-[10px] font-semibold uppercase tracking-wider mb-1">Séries / Animes</p>
+                    <p id="countSeries" class="text-2xl font-bold text-indigo-400">0</p>
+                </div>
+                <div class="bg-zinc-900 p-4 rounded-2xl border border-zinc-800 flex flex-col justify-center items-center shadow-lg">
+                    <p class="text-zinc-500 text-[10px] font-semibold uppercase tracking-wider mb-1">Filmes</p>
+                    <p id="countMovies" class="text-2xl font-bold text-emerald-400">0</p>
+                </div>
+                <div class="bg-zinc-900 p-4 rounded-2xl border border-zinc-800 flex flex-col justify-center items-center shadow-lg">
+                    <p class="text-zinc-500 text-[10px] font-semibold uppercase tracking-wider mb-1">Links Extraídos</p>
+                    <p id="countLinks" class="text-2xl font-bold text-amber-400">0</p>
+                </div>
+            </div>
+
+            <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-8">
+                <div class="flex flex-col sm:flex-row w-full lg:w-auto gap-3">
+                    <div class="relative w-full sm:w-72">
+                        <i class="fa-solid fa-search absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500 text-xs"></i>
+                        <input type="text" oninput="cat.search(this.value)" placeholder="Pesquisar no acervo..." class="w-full bg-zinc-900 text-zinc-200 text-sm rounded-xl pl-10 pr-4 py-2.5 border border-zinc-800 focus:border-zinc-600 focus:outline-none transition-colors">
+                    </div>
+                </div>
+                
+                <div class="flex gap-2 w-full lg:w-auto overflow-x-auto pb-2 lg:pb-0 scrollbar-hide items-center">
+                    <button onclick="cat.init()" class="bg-zinc-900 text-zinc-400 border border-zinc-800 hover:text-white px-4 py-2 rounded-xl text-xs font-medium whitespace-nowrap transition-colors flex items-center gap-2 mr-2">
+                        <i class="fa-solid fa-rotate"></i> Atualizar
+                    </button>
+                    <button onclick="cat.filter('all')" id="btn-all" class="filter-btn bg-white text-zinc-900 px-5 py-2 rounded-xl text-xs font-medium whitespace-nowrap transition-colors shadow-sm">Todos</button>
+                    <button onclick="cat.filter('series')" id="btn-series" class="filter-btn bg-zinc-900 text-zinc-400 border border-zinc-800 hover:text-zinc-200 px-5 py-2 rounded-xl text-xs font-medium whitespace-nowrap transition-colors">Séries</button>
+                    <button onclick="cat.filter('movie')" id="btn-movie" class="filter-btn bg-zinc-900 text-zinc-400 border border-zinc-800 hover:text-zinc-200 px-5 py-2 rounded-xl text-xs font-medium whitespace-nowrap transition-colors">Filmes</button>
+                </div>
+            </div>
+
+            <!-- Grelha do Catálogo -->
+            <div id="gridContainer" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 md:gap-6 pb-20">
+                <!-- Preenchido via Javascript -->
+            </div>
+        </div>
+
+        <!-- ABA 2: GERADOR (Apenas Admin) -->
         <div id="view-generator" class="tab-content">
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                
+                <!-- Coluna 1: Cinemeta Search -->
+                <div class="lg:col-span-1">
+                    <div class="bg-zinc-900 rounded-2xl border border-zinc-800 p-5 flex flex-col h-[calc(100vh-120px)] sticky top-24">
+                        <h2 class="text-sm font-semibold text-white mb-4 flex items-center gap-2">
+                            <i class="fa-solid fa-magnifying-glass text-indigo-500"></i> Cinemeta
+                        </h2>
+                        <div class="relative mb-4">
+                            <input type="text" id="cinemetaSearch" onkeypress="if(event.key === 'Enter') gen.searchCinemeta()" placeholder="Pesquisar título..." class="w-full bg-zinc-950 text-zinc-200 text-sm rounded-xl pl-3 pr-10 py-2.5 border border-zinc-800 focus:border-indigo-500 focus:outline-none transition-colors">
+                            <button onclick="gen.searchCinemeta()" class="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white px-2 py-1"><i class="fa-solid fa-search"></i></button>
+                        </div>
+                        <div id="cinemetaResults" class="flex-grow overflow-y-auto space-y-2 custom-scrollbar pr-2 pb-4">
+                            <p class="text-[10px] text-zinc-500 text-center mt-4 uppercase tracking-wider">Pesquise para preencher</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Coluna Principal -->
                 <div class="lg:col-span-2 space-y-6">
                     <div class="bg-zinc-900 rounded-2xl border border-zinc-800 p-6 md:p-8">
-                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
-                            <h2 class="text-lg font-semibold text-white">Detalhes do Conteúdo</h2>
-                            <div class="flex gap-2 w-full sm:w-auto">
-                                <label class="cursor-pointer bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-4 py-2 rounded-lg text-xs font-medium transition flex-1 sm:flex-none text-center">
-                                    Importar JSON
-                                    <input type="file" accept=".json" class="hidden" onchange="gen.loadExistingJson(this)">
+                            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+                                <h2 class="text-lg font-semibold text-white">Criar / Editar Conteúdo</h2>
+                                <div class="flex gap-2 w-full sm:w-auto">
+                                    <button onclick="gen.reset()" class="text-xs font-medium bg-zinc-950 hover:bg-zinc-800 text-zinc-400 border border-zinc-800 px-4 py-2 rounded-lg transition flex-1 sm:flex-none">
+                                        <i class="fa-solid fa-eraser"></i> Limpar
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Tipo -->
+                            <div class="flex gap-6 mb-8 border-b border-zinc-800 pb-6">
+                                <label class="flex items-center gap-2 cursor-pointer group">
+                                    <input type="radio" name="contentType" value="series" checked="" onchange="gen.toggleInputs()" class="w-4 h-4 text-indigo-500 bg-zinc-950 border-zinc-800 focus:ring-indigo-500">
+                                    <span class="font-medium text-sm text-zinc-400 group-hover:text-zinc-200 transition">Série / Anime</span>
                                 </label>
-                                <button onclick="gen.reset()" class="text-xs font-medium bg-zinc-950 hover:bg-zinc-800 text-zinc-400 border border-zinc-800 px-4 py-2 rounded-lg transition flex-1 sm:flex-none">
-                                    Limpar
+                                <label class="flex items-center gap-2 cursor-pointer group">
+                                    <input type="radio" name="contentType" value="movie" onchange="gen.toggleInputs()" class="w-4 h-4 text-indigo-500 bg-zinc-950 border-zinc-800 focus:ring-indigo-500">
+                                    <span class="font-medium text-sm text-zinc-400 group-hover:text-zinc-200 transition">Filme</span>
+                                </label>
+                            </div>
+
+                            <!-- Campos Principais -->
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-5 mb-6">
+                                <div class="md:col-span-2">
+                                    <label class="block text-xs font-medium text-zinc-500 mb-2">Nome de Exibição / Ficheiro</label>
+                                    <input type="text" id="seriesName" class="input-unified w-full p-3 rounded-lg text-sm" placeholder="Ex: tt0903747 ou Breaking Bad">
+                                    <input type="hidden" id="fileNameOriginal">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-zinc-500 mb-2">ID IMDb <span class="text-red-400">*</span></label>
+                                    <input type="text" id="contentId" class="input-unified w-full p-3 rounded-lg font-mono text-sm" placeholder="tt0903747">
+                                </div>
+                                <div class="flex gap-2">
+                                    <div class="w-1/2">
+                                        <label class="block text-xs font-medium text-zinc-500 mb-2">Idioma</label>
+                                        <select id="audioLanguage" class="input-unified w-full p-3 rounded-lg text-sm appearance-none">
+                                            <option value="Dobrao">Dobrado</option>
+                                            <option value="Legendado">Legendado</option>
+                                            <option value="Dual Áudio">Dual Áudio</option>
+                                            <option value="Nacional">Nacional</option>
+                                        </select>
+                                    </div>
+                                    <div class="w-1/2">
+                                        <label class="block text-xs font-medium text-zinc-500 mb-2">Qualidade</label>
+                                        <select id="videoQuality" class="input-unified w-full p-3 rounded-lg text-sm appearance-none">
+                                            <option value="1080p">1080p</option>
+                                            <option value="720p">720p</option>
+                                            <option value="4K">4K</option>
+                                            <option value="SD">SD</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Temporadas (Séries) -->
+                            <div id="seasonContainer" class="bg-zinc-950/50 p-5 rounded-xl border border-zinc-800/50 mb-6">
+                                <div class="flex flex-wrap gap-4 items-end">
+                                    <div class="flex-1">
+                                        <label class="block text-[10px] font-medium text-zinc-500 uppercase mb-2">
+                                            Temporada <span id="seasonLimit" class="text-indigo-400 font-bold ml-1"></span>
+                                        </label>
+                                        <input type="number" id="seasonNum" value="1" min="1" oninput="gen.updateLimits()" class="input-unified w-full p-3 rounded-lg text-center text-sm">
+                                    </div>
+                                    <div class="flex-1">
+                                        <label class="block text-[10px] font-medium text-zinc-500 uppercase mb-2">
+                                            Ep. Inicial <span id="episodeLimit" class="text-indigo-400 font-bold ml-1"></span>
+                                        </label>
+                                        <input type="number" id="startEp" value="1" min="1" class="input-unified w-full p-3 rounded-lg text-center text-sm">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Links -->
+                            <div>
+                                <div class="flex justify-between items-end mb-3">
+                                    <label class="block text-xs font-medium text-zinc-500">Links de Transmissão Brutos</label>
+                                </div>
+                                <textarea id="manualLinks" rows="5" class="input-unified w-full p-4 rounded-xl text-xs font-mono custom-scrollbar" placeholder="Cole os links de video diretos aqui..."></textarea>
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-4 mt-6">
+                                <button onclick="gen.process()" class="w-full bg-zinc-800 hover:bg-zinc-700 text-white font-medium py-3.5 rounded-xl transition flex justify-center items-center gap-2">
+                                    <i class="fa-solid fa-gears"></i> Processar Links
+                                </button>
+                                <button onclick="gen.saveToServer()" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-3.5 rounded-xl transition flex justify-center items-center gap-2 shadow-lg shadow-indigo-900/20">
+                                    <i class="fa-solid fa-cloud-arrow-up"></i> Guardar no Servidor
                                 </button>
                             </div>
-                        </div>
-
-                        <!-- Tipo de Conteúdo -->
-                        <div class="flex gap-6 mb-8 border-b border-zinc-800 pb-6">
-                            <label class="flex items-center gap-2 cursor-pointer group">
-                                <input type="radio" name="contentType" value="series" checked="" onchange="gen.toggleInputs()" class="w-4 h-4 text-indigo-500 bg-zinc-950 border-zinc-800 focus:ring-indigo-500">
-                                <span class="font-medium text-sm text-zinc-400 group-hover:text-zinc-200 transition">Série / Anime</span>
-                            </label>
-                            <label class="flex items-center gap-2 cursor-pointer group">
-                                <input type="radio" name="contentType" value="movie" onchange="gen.toggleInputs()" class="w-4 h-4 text-indigo-500 bg-zinc-950 border-zinc-800 focus:ring-indigo-500">
-                                <span class="font-medium text-sm text-zinc-400 group-hover:text-zinc-200 transition">Filme</span>
-                            </label>
-                        </div>
-
-                        <!-- Campos Principais -->
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-5 mb-6">
-                            <div class="md:col-span-2">
-                                <label class="block text-xs font-medium text-zinc-500 mb-2">Nome do Arquivo</label>
-                                <input type="text" id="seriesName" class="input-unified w-full p-3 rounded-lg text-sm" placeholder="Ex: Breaking Bad">
-                            </div>
-                            <div>
-                                <label class="block text-xs font-medium text-zinc-500 mb-2">ID IMDb <span class="text-red-400">*</span></label>
-                                <input type="text" id="contentId" class="input-unified w-full p-3 rounded-lg font-mono text-sm" placeholder="tt0903747">
-                            </div>
-                            <div>
-                                <label class="block text-xs font-medium text-zinc-500 mb-2">Idioma / Áudio</label>
-                                <select id="audioLanguage" class="input-unified w-full p-3 rounded-lg text-sm appearance-none">
-                                    <option value="Dublado">Dublado</option>
-                                    <option value="Legendado">Legendado</option>
-                                    <option value="Nacional">Nacional</option>
-                                    <option value="Dual Áudio">Dual Áudio</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <!-- Temporadas (Séries) -->
-                        <div id="seasonContainer" class="bg-zinc-950/50 p-5 rounded-xl border border-zinc-800/50 mb-6">
-                            <div class="flex flex-wrap gap-4 items-end">
-                                <div class="w-full sm:w-24">
-                                    <label class="block text-[10px] font-medium text-zinc-500 uppercase mb-2">Temporada</label>
-                                    <input type="number" id="seasonNum" value="1" class="input-unified w-full p-3 rounded-lg text-center text-sm">
-                                </div>
-                                <div class="w-full sm:w-24">
-                                    <label class="block text-[10px] font-medium text-zinc-500 uppercase mb-2">Ep. Inicial</label>
-                                    <input type="number" id="startEp" value="1" class="input-unified w-full p-3 rounded-lg text-center text-sm">
-                                </div>
-                                <div class="flex-1 min-w-[200px] text-xs text-zinc-500 pb-2">
-                                    <span class="text-zinc-300 font-medium">Smart Detect:</span> Cole "S01E01" ou "1x01" na lista de links.
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Links -->
-                        <div>
-                            <div class="flex justify-between items-end mb-3">
-                                <label class="block text-xs font-medium text-zinc-500">Links de Transmissão</label>
-                                <div class="flex gap-2">
-                                    <button onclick="gen.migrateHost()" class="text-[10px] text-zinc-400 hover:text-white px-2 py-1 rounded transition flex items-center gap-1">
-                                        <i class="fa-solid fa-rotate"></i> Migrar Render
-                                    </button>
-                                    <label class="text-[10px] text-zinc-400 hover:text-white px-2 py-1 rounded cursor-pointer transition flex items-center gap-1">
-                                        <input type="file" accept=".txt" class="hidden" onchange="gen.loadTxt(this)">
-                                        <i class="fa-solid fa-file-lines"></i> TXT
-                                    </label>
-                                </div>
-                            </div>
-                            <textarea id="manualLinks" rows="6" class="input-unified w-full p-4 rounded-xl text-xs font-mono custom-scrollbar" placeholder="Cole os links de vídeo diretos aqui..."></textarea>
-                        </div>
-
-                        <button onclick="gen.process()" class="mt-6 w-full bg-white hover:bg-zinc-200 text-zinc-950 font-medium py-3.5 rounded-xl transition flex justify-center items-center gap-2">
-                            Processar Conteúdo
-                        </button>
                     </div>
                 </div>
 
@@ -203,194 +251,86 @@
                     <div class="bg-zinc-900 rounded-2xl border border-zinc-800 flex flex-col h-full">
                         <div class="p-5 border-b border-zinc-800 flex justify-between items-center">
                             <h3 class="font-medium text-white text-sm">Preview JSON</h3>
-                            <span id="jsonStats" class="text-[10px] font-mono text-zinc-500">Vazio</span>
                         </div>
                         
                         <div class="flex-grow relative bg-zinc-950 p-5 overflow-hidden">
                             <textarea id="jsonOutput" class="w-full text-xs text-zinc-400 bg-transparent font-mono h-full min-h-[400px] focus:outline-none resize-none custom-scrollbar" spellcheck="false" oninput="gen.syncManualEdit()" placeholder="// O resultado aparecerá aqui..."></textarea>
-                            
-                            <div id="resultActions" class="absolute bottom-5 right-5 flex gap-2 hidden">
-                                <button onclick="gen.openVisualEditor()" class="bg-zinc-800 hover:bg-zinc-700 text-white px-4 py-2 rounded-lg border border-zinc-700 text-xs font-medium flex items-center gap-2 transition" title="Gerir Links Visualmente">
-                                    Gerir Links
-                                </button>
-                                <button onclick="gen.copy()" class="bg-zinc-800 hover:bg-zinc-700 text-white p-2 rounded-lg border border-zinc-700 transition" title="Copiar JSON">
-                                    <i class="fa-regular fa-copy"></i>
-                                </button>
-                                <button onclick="gen.download()" class="bg-white hover:bg-zinc-200 text-zinc-950 p-2 rounded-lg transition" title="Baixar Arquivo .json">
-                                    <i class="fa-solid fa-download"></i>
-                                </button>
-                                <button onclick="gen.uploadParaBanco()" class="bg-indigo-600 hover:bg-indigo-500 text-white p-2 rounded-lg transition shadow-lg shadow-indigo-500/20" title="Salvar JSON no Banco">
-                                    <i class="fa-solid fa-cloud-arrow-up"></i>
-                                </button>
-                            </div>
-                        </div>
-                        <div class="p-4 rounded-b-2xl border-t border-zinc-800 text-xs text-zinc-500 text-center truncate">
-                            Arquivo final: <span id="fileNamePreview" class="text-zinc-300 font-mono">data.json</span>
                         </div>
                     </div>
                 </div>
-            </div>
-        </div>
-
-        <!-- ABA 2: CATÁLOGO -->
-        <div id="view-catalog" class="tab-content active">
-            
-            <!-- Cards de Status -->
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-                <div class="bg-zinc-900 p-5 rounded-2xl border border-zinc-800 flex flex-col justify-center">
-                    <p class="text-zinc-500 text-[10px] font-semibold uppercase tracking-wider mb-1">Filmes</p>
-                    <p id="countMovies" class="text-2xl font-medium text-white">0</p>
-                </div>
-                <div class="bg-zinc-900 p-5 rounded-2xl border border-zinc-800 flex flex-col justify-center">
-                    <p class="text-zinc-500 text-[10px] font-semibold uppercase tracking-wider mb-1">Séries</p>
-                    <p id="countSeries" class="text-2xl font-medium text-white">0</p>
-                </div>
-                <div class="bg-zinc-900 p-5 rounded-2xl border border-zinc-800 flex flex-col justify-center">
-                    <p class="text-zinc-500 text-[10px] font-semibold uppercase tracking-wider mb-1">Episódios Totais</p>
-                    <p id="countTotalEps" class="text-2xl font-medium text-white">0</p>
-                </div>
-                <div class="bg-zinc-900 p-5 rounded-2xl border border-zinc-800 flex flex-col justify-center">
-                    <p class="text-zinc-500 text-[10px] font-semibold uppercase tracking-wider mb-1">Incompletos</p>
-                    <p id="countMissing" class="text-2xl font-medium text-white">0</p>
-                </div>
-            </div>
-
-            <!-- Ferramentas e Filtros -->
-            <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-8">
-                <div class="flex flex-col sm:flex-row w-full lg:w-auto gap-3">
-                    <div class="relative w-full sm:w-72">
-                        <i class="fa-solid fa-search absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500 text-xs"></i>
-                        <input type="text" oninput="cat.search(this.value)" placeholder="Buscar catálogo..." class="w-full bg-zinc-900 text-zinc-200 text-sm rounded-xl pl-10 pr-4 py-2.5 border border-zinc-800 focus:border-zinc-600 focus:outline-none transition-colors">
-                    </div>
-                    
-                    <div class="relative w-full sm:w-48">
-                        <select onchange="cat.sort(this.value)" class="w-full bg-zinc-900 text-zinc-200 text-sm rounded-xl px-4 py-2.5 border border-zinc-800 focus:border-zinc-600 focus:outline-none appearance-none cursor-pointer">
-                            <option value="newest">Mais Recentes</option>
-                            <option value="oldest">Mais Antigos</option>
-                            <option value="year">Ano de Lançamento</option>
-                            <option value="name">Ordem Alfabética</option>
-                        </select>
-                        <i class="fa-solid fa-chevron-down absolute right-4 top-1/2 -translate-y-1/2 text-zinc-600 text-xs pointer-events-none"></i>
-                    </div>
-                </div>
                 
-                <div class="flex gap-2 w-full lg:w-auto overflow-x-auto pb-2 lg:pb-0 scrollbar-hide items-center">
-                    <button onclick="cat.init()" class="bg-zinc-900 text-zinc-400 border border-zinc-800 hover:text-white px-4 py-2 rounded-xl text-xs font-medium whitespace-nowrap transition-colors flex items-center gap-2 mr-2">
-                        <i class="fa-solid fa-rotate"></i> Atualizar
-                    </button>
-
-                    <!-- Botão de Upload em Lote -->
-                    <label class="cursor-pointer bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-xl text-xs font-medium whitespace-nowrap transition-colors flex items-center gap-2 mr-2 shadow-sm" title="Enviar vários ficheiros .json para o banco">
-                        <i class="fa-solid fa-cloud-arrow-up"></i> Upload Lote
-                        <input type="file" accept=".json" multiple class="hidden" onchange="cat.uploadEmMassa(this)">
-                    </label>
+                <!-- Upload em Lote (Lado a Lado ou Abaixo) -->
+                <div class="col-span-1 lg:col-span-4 bg-zinc-900 rounded-2xl border border-zinc-800 p-6 mt-2 admin-only-block">
+                    <h2 class="text-base font-semibold text-white mb-2 flex items-center gap-2">
+                        <i class="fa-solid fa-file-import text-emerald-400"></i> Importar JSONs em Lote
+                    </h2>
+                    <p class="text-xs text-zinc-500 mb-4">Selecione vários ficheiros .json do seu computador para enviar de uma vez para o banco de dados.</p>
                     
-                    <button onclick="cat.filter('all')" id="btn-all" class="filter-btn bg-white text-zinc-900 px-5 py-2 rounded-xl text-xs font-medium whitespace-nowrap transition-colors shadow-sm">Todos</button>
-                    <button onclick="cat.filter('series')" id="btn-series" class="filter-btn bg-zinc-900 text-zinc-400 border border-zinc-800 hover:text-zinc-200 px-5 py-2 rounded-xl text-xs font-medium whitespace-nowrap transition-colors">Séries</button>
-                    <button onclick="cat.filter('movie')" id="btn-movie" class="filter-btn bg-zinc-900 text-zinc-400 border border-zinc-800 hover:text-zinc-200 px-5 py-2 rounded-xl text-xs font-medium whitespace-nowrap transition-colors">Filmes</button>
-                    
-                    <div class="w-px h-6 bg-zinc-800 mx-1 hidden sm:block"></div>
-                    
-                    <button onclick="cat.filter('missing_all')" id="btn-missing_all" class="filter-btn bg-zinc-900 text-amber-500 border border-zinc-800 hover:bg-zinc-800 px-5 py-2 rounded-xl text-xs font-medium whitespace-nowrap transition-colors flex items-center gap-2">
-                        <i class="fa-solid fa-triangle-exclamation"></i> Incompletos
-                    </button>
-                </div>
-            </div>
-
-            <!-- Grade do Catálogo -->
-            <div id="gridContainer" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 md:gap-6 pb-20">
-                <!-- Preenchido via JS -->
-            </div>
-            
-            <!-- Status API Canto Inferior -->
-            <div class="fixed bottom-6 right-6 hidden md:block z-40 bg-zinc-900/80 backdrop-blur border border-zinc-800 px-4 py-2 rounded-full shadow-lg">
-                <span id="apiStatus" class="text-[10px] text-zinc-400 flex items-center gap-2 font-medium uppercase tracking-wider">
-                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Conectado
-                </span>
-            </div>
-        </div>
-
-        <!-- ABA 3: PEDIDOS / TXT -->
-        <div id="view-requests" class="tab-content">
-            <div class="bg-zinc-900 rounded-2xl border border-zinc-800 p-6 md:p-8">
-                
-                <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-8 border-b border-zinc-800 pb-8">
-                    <div>
-                        <h2 class="text-lg font-semibold text-white">Análise de Pedidos Ausentes</h2>
-                        <p class="text-sm text-zinc-500 mt-1">Carregue logs TXT para identificar e gerir conteúdo em falta.</p>
-                    </div>
-                    
-                    <div class="flex flex-wrap gap-3">
-                        <label class="cursor-pointer bg-white hover:bg-zinc-200 text-zinc-950 px-4 py-2 rounded-lg text-xs font-medium transition flex items-center gap-2">
-                            Ler TXT
-                            <input type="file" accept=".txt" class="hidden" onchange="reqProcessor.handleUpload(this)">
-                        </label>
-                        <label class="cursor-pointer bg-zinc-800 hover:bg-zinc-700 text-white px-4 py-2 rounded-lg text-xs font-medium border border-zinc-700 transition flex items-center gap-2">
-                            Restaurar JSON
-                            <input type="file" accept=".json" class="hidden" onchange="reqProcessor.handleJsonUpload(this)">
-                        </label>
-                        <button onclick="reqProcessor.clearData()" class="bg-zinc-950 hover:bg-red-950 text-zinc-400 hover:text-red-400 border border-zinc-800 hover:border-red-900 px-3 py-2 rounded-lg transition flex items-center justify-center">
-                            <i class="fa-solid fa-trash-can"></i>
+                    <div class="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+                        <input type="file" id="bulkJsonUpload" multiple accept=".json" class="block w-full text-sm text-zinc-400 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-zinc-800 file:text-emerald-400 hover:file:bg-zinc-700 transition cursor-pointer">
+                        
+                        <button onclick="gen.uploadBulk(event)" class="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-500 text-white font-medium py-2.5 px-6 rounded-xl transition flex justify-center items-center gap-2 shadow-lg shadow-emerald-900/20">
+                            <i class="fa-solid fa-cloud-arrow-up"></i> Enviar Ficheiros
                         </button>
                     </div>
                 </div>
 
-                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-                    <div class="bg-zinc-950 p-4 rounded-xl border border-zinc-800/50">
-                        <p class="text-zinc-500 text-[10px] font-semibold uppercase mb-1">Linhas Analisadas</p>
-                        <p id="req-total-lines" class="text-xl font-medium text-white">0</p>
-                    </div>
-                    <div class="bg-zinc-950 p-4 rounded-xl border border-zinc-800/50">
-                        <p class="text-zinc-500 text-[10px] font-semibold uppercase mb-1">Ocorrências</p>
-                        <p id="req-total-requests" class="text-xl font-medium text-white">0</p>
-                    </div>
-                    <div class="bg-zinc-950 p-4 rounded-xl border border-zinc-800/50">
-                        <p class="text-zinc-500 text-[10px] font-semibold uppercase mb-1">Filmes Únicos</p>
-                        <p id="req-movies-count" class="text-xl font-medium text-white">0</p>
-                    </div>
-                    <div class="bg-zinc-950 p-4 rounded-xl border border-zinc-800/50">
-                        <p class="text-zinc-500 text-[10px] font-semibold uppercase mb-1">Séries Únicas</p>
-                        <p id="req-series-count" class="text-xl font-medium text-white">0</p>
+            </div>
+        </div>
+
+        <!-- ABA 3: PEDIDOS (Pública) -->
+        <div id="view-pedidos" class="tab-content">
+            <div class="max-w-2xl mx-auto">
+                <!-- Formulário de Pedido -->
+                <div class="bg-zinc-900 rounded-2xl border border-zinc-800 p-6 mb-6">
+                    <h2 class="text-base font-semibold text-white mb-1 flex items-center gap-2">
+                        <i class="fa-solid fa-bell text-indigo-400"></i> Fazer um Pedido
+                    </h2>
+                    <p class="text-xs text-zinc-500 mb-5">Peça um filme ou série e o modelo vai identificar automaticamente o tipo para si!</p>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-xs font-medium text-zinc-500 mb-2">O seu Nome</label>
+                            <input type="text" id="pedidoNome" class="input-unified w-full p-3 rounded-lg text-sm" placeholder="Ex: João Silva">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-zinc-500 mb-2">Título que deseja</label>
+                            <input type="text" id="pedidoTitulo" class="input-unified w-full p-3 rounded-lg text-sm" placeholder="Ex: Interestelar, Breaking Bad...">
+                        </div>
+                        <div id="pedidoTipoDetectado" class="hidden bg-zinc-950 rounded-xl p-3 border border-zinc-800 text-xs text-zinc-400 flex items-center gap-2">
+                            <i class="fa-solid fa-circle-notch fa-spin text-indigo-400" id="pedidoTipoIcon"></i>
+                            <span id="pedidoTipoTexto">A identificar...</span>
+                        </div>
+                        <button onclick="pedidos.enviar()" id="btnEnviarPedido" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-3 rounded-xl transition flex justify-center items-center gap-2 text-sm">
+                            <i class="fa-solid fa-paper-plane"></i> Enviar Pedido
+                        </button>
                     </div>
                 </div>
 
-                <div id="req-search-row" class="hidden flex flex-col sm:flex-row gap-3 mb-6">
-                    <div class="relative flex-1">
-                        <i class="fa-solid fa-search absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500 text-xs"></i>
-                        <input type="text" id="req-search" oninput="reqProcessor.renderList()" placeholder="Buscar ausentes..." class="w-full bg-zinc-950 text-white text-sm rounded-xl pl-10 pr-4 py-2 border border-zinc-800 focus:border-zinc-600 focus:outline-none transition-colors">
-                    </div>
-                    <select id="req-sort" onchange="reqProcessor.renderList()" class="bg-zinc-950 text-white text-sm rounded-xl px-4 py-2 border border-zinc-800 focus:outline-none appearance-none cursor-pointer">
-                        <option value="count">Mais Pedidos</option>
-                        <option value="alpha">A-Z</option>
-                        <option value="type">Por Tipo</option>
-                    </select>
-                    <select id="req-filter-type" onchange="reqProcessor.renderList()" class="bg-zinc-950 text-white text-sm rounded-xl px-4 py-2 border border-zinc-800 focus:outline-none appearance-none cursor-pointer">
-                        <option value="all">Todos Tipos</option>
-                        <option value="movie">Filmes</option>
-                        <option value="series">Séries</option>
-                    </select>
-                </div>
-
-                <div class="bg-zinc-950 rounded-xl border border-zinc-800 p-4 max-h-[500px] overflow-y-auto custom-scrollbar mb-6">
-                    <div id="req-results-container" class="space-y-2">
-                        <div class="text-center py-12 text-zinc-600 flex flex-col items-center">
-                            <p class="text-sm font-medium">Aguardando dados.</p>
-                            <span id="req-loading-status" class="text-[10px] uppercase tracking-wider mt-2">Pronto para leitura</span>
+                <!-- Lista de Pedidos -->
+                <div class="bg-zinc-900 rounded-2xl border border-zinc-800 p-6">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
+                        <h2 class="text-base font-semibold text-white flex items-center gap-2">
+                            <i class="fa-solid fa-list-check text-emerald-400"></i> Pedidos Registados
+                        </h2>
+                        <div class="flex gap-2 items-center flex-wrap">
+                            <button onclick="pedidos.carregar('all')" id="pfbtn-all" class="pf-btn bg-white text-zinc-900 px-4 py-1.5 rounded-lg text-xs font-medium transition-colors">Todos</button>
+                            <button onclick="pedidos.carregar('filme')" id="pfbtn-filme" class="pf-btn bg-zinc-800 text-zinc-400 border border-zinc-700 hover:text-white px-4 py-1.5 rounded-lg text-xs font-medium transition-colors">Filmes</button>
+                            <button onclick="pedidos.carregar('serie')" id="pfbtn-serie" class="pf-btn bg-zinc-800 text-zinc-400 border border-zinc-700 hover:text-white px-4 py-1.5 rounded-lg text-xs font-medium transition-colors">Séries</button>
+                            <button onclick="pedidos.carregar(pedidos.filtroAtual)" class="text-zinc-600 hover:text-white transition flex items-center gap-1 text-xs ml-1">
+                                <i class="fa-solid fa-rotate"></i>
+                            </button>
                         </div>
                     </div>
-                </div>
-                
-                <div class="flex justify-end gap-3">
-                    <button onclick="reqProcessor.downloadJson()" id="btn-download-json" class="hidden bg-zinc-800 hover:bg-zinc-700 text-white px-4 py-2 rounded-lg text-xs font-medium border border-zinc-700 transition">Salvar Progresso JSON</button>
-                    <button onclick="reqProcessor.downloadCsv()" id="btn-download-csv" class="hidden bg-zinc-800 hover:bg-zinc-700 text-white px-4 py-2 rounded-lg text-xs font-medium border border-zinc-700 transition">Exportar CSV</button>
-                    <button onclick="reqProcessor.downloadTxt()" id="btn-download-txt" class="hidden bg-white hover:bg-zinc-200 text-zinc-900 px-4 py-2 rounded-lg text-xs font-medium transition">Relatório TXT</button>
+                    <div id="pedidosList" class="space-y-3">
+                        <p class="text-zinc-600 text-xs text-center py-6">A carregar pedidos...</p>
+                    </div>
                 </div>
             </div>
         </div>
 
     </main>
 
-    <!-- Modal do Catálogo (Ver Links) -->
+    <!-- Modal Padrão -->
     <div id="linkModal" class="fixed inset-0 bg-black/90 backdrop-blur-sm hidden flex items-center justify-center z-[100] p-4">
         <div class="bg-zinc-900 w-full max-w-2xl rounded-2xl shadow-2xl border border-zinc-800 flex flex-col max-h-[85vh] overflow-hidden">
             <div class="p-6 border-b border-zinc-800 flex justify-between items-start gap-4 bg-zinc-900">
@@ -398,1131 +338,642 @@
                     <h3 id="modalTitle" class="text-lg font-semibold text-white leading-tight">Título</h3>
                     <div id="modalStats" class="mt-2 flex items-center gap-3 text-xs"></div>
                 </div>
-                <div class="flex gap-2 items-center flex-shrink-0">
-                    <button id="btnModalEdit" class="text-[10px] uppercase font-bold bg-white text-zinc-900 hover:bg-zinc-200 px-3 py-2 rounded-lg transition">Editar JSON</button>
-                    <button onclick="cat.closeModal()" class="text-zinc-500 hover:text-white bg-zinc-950 border border-zinc-800 hover:bg-zinc-800 w-9 h-9 rounded-full transition flex items-center justify-center"><i class="fa-solid fa-xmark"></i></button>
-                </div>
+                <button onclick="cat.closeModal()" class="text-zinc-500 hover:text-white bg-zinc-950 border border-zinc-800 hover:bg-zinc-800 w-9 h-9 rounded-full transition flex items-center justify-center"><i class="fa-solid fa-xmark"></i></button>
             </div>
             <div id="modalContent" class="p-6 overflow-y-auto space-y-2 bg-zinc-950 flex-grow custom-scrollbar"></div>
-            <div class="p-4 bg-zinc-900 border-t border-zinc-800 flex justify-between items-center text-[10px] font-medium text-zinc-500 uppercase tracking-wider">
-                <span>Use o botão Editar para gerir</span>
-                <span id="modalTotalLinks">0 links</span>
-            </div>
         </div>
     </div>
 
-    <!-- Modal do Gestor Visual de Links -->
-    <div id="visualEditorModal" class="fixed inset-0 bg-black/90 backdrop-blur-sm hidden flex items-center justify-center z-[150] p-4">
-        <div class="bg-zinc-900 w-full max-w-4xl rounded-2xl shadow-2xl border border-zinc-800 flex flex-col max-h-[85vh] overflow-hidden">
-            <div class="p-6 border-b border-zinc-800 flex justify-between items-center bg-zinc-900">
-                <div>
-                    <h3 class="text-lg font-semibold text-white">Gestor de Links</h3>
-                    <p class="text-xs text-zinc-500 mt-1">Altere nomes ou remova URLs do arquivo gerado.</p>
-                </div>
-                <button onclick="gen.closeVisualEditor()" class="text-zinc-500 hover:text-white bg-zinc-950 border border-zinc-800 hover:bg-zinc-800 w-9 h-9 rounded-full transition flex items-center justify-center"><i class="fa-solid fa-xmark"></i></button>
-            </div>
-            <div id="visualEditorContent" class="p-6 overflow-y-auto space-y-3 bg-zinc-950 flex-grow custom-scrollbar"></div>
-            <div class="p-5 bg-zinc-900 border-t border-zinc-800 flex justify-end gap-3">
-                <button onclick="gen.closeVisualEditor()" class="px-5 py-2.5 bg-zinc-950 border border-zinc-800 hover:bg-zinc-800 text-zinc-300 text-xs font-medium rounded-xl transition">Descartar</button>
-                <button onclick="gen.saveVisualEditor()" class="px-6 py-2.5 bg-white hover:bg-zinc-200 text-zinc-900 text-xs font-medium rounded-xl transition">Salvar Mudanças</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Container de Toasts (Notificações) -->
-    <div id="toast-container" class="fixed bottom-6 left-1/2 -translate-x-1/2 md:translate-x-0 md:left-auto md:right-6 z-[200] flex flex-col gap-2 pointer-events-none w-[90%] md:w-auto"></div>
+    <!-- Toasts -->
+    <div id="toast-container" class="fixed bottom-6 right-6 z-[200] flex flex-col gap-2 pointer-events-none"></div>
 
     <script>
-        // --- UTILIDADES ---
+        // === UTILIDADES ===
         function showToast(message, type = 'success') {
             const container = document.getElementById('toast-container');
             const toast = document.createElement('div');
-            
-            const colors = { success: 'bg-zinc-900 border-zinc-800 text-white', error: 'bg-red-950 border-red-900 text-red-100', info: 'bg-zinc-900 border-zinc-800 text-white', warning: 'bg-zinc-900 border-zinc-800 text-zinc-300' };
-            const icons = { success: 'fa-check text-emerald-400', error: 'fa-xmark text-red-400', info: 'fa-info text-blue-400', warning: 'fa-triangle-exclamation text-amber-400' };
-
-            toast.className = `toast flex items-center gap-3 px-5 py-3.5 rounded-xl shadow-2xl border ${colors[type] || colors.info} min-w-[280px]`;
-            toast.innerHTML = `<i class="fa-solid ${icons[type]} text-sm"></i><span class="text-xs font-medium">${message}</span>`;
-
+            const colors = { success: 'bg-zinc-900 border-zinc-800 text-emerald-400', error: 'bg-red-950 border-red-900 text-red-400', info: 'bg-zinc-900 border-zinc-800 text-white' };
+            const icons = { success: 'fa-check', error: 'fa-xmark', info: 'fa-info' };
+            toast.className = `toast flex items-center gap-3 px-5 py-3.5 rounded-xl shadow-2xl border ${colors[type]} min-w-[250px]`;
+            toast.innerHTML = `<i class="fa-solid ${icons[type]} text-sm"></i><span class="text-xs font-medium text-white">${message}</span>`;
             container.appendChild(toast);
-            setTimeout(() => {
-                toast.style.opacity = '0';
-                toast.style.transform = 'translateY(100%) scale(0.95)';
-                toast.style.transition = 'all 0.3s ease';
-                setTimeout(() => toast.remove(), 300);
-            }, 3000);
+            setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 300); }, 3000);
         }
-
-        const escapeHTML = str => (str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/\n/g, '&#10;');
-
         function switchView(viewName) {
             document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active', 'bg-white', 'text-zinc-900'));
             
-            document.querySelectorAll('.nav-btn').forEach(btn => {
-                btn.classList.remove('active', 'bg-white', 'text-zinc-900', 'border-white');
-                btn.classList.add('bg-transparent', 'text-zinc-400', 'border-zinc-800');
-            });
-
             document.getElementById(`view-${viewName}`).classList.add('active');
-            
             const activeBtn = document.getElementById(`btn-${viewName}`);
-            if(activeBtn) {
-                activeBtn.classList.add('active', 'bg-white', 'text-zinc-900', 'border-white');
-                activeBtn.classList.remove('bg-transparent', 'text-zinc-400', 'border-zinc-800');
-            }
-
-            if(viewName === 'catalog' && cat.allItems.length === 0) {
-                cat.init();
+            if(activeBtn) activeBtn.classList.add('active', 'bg-white', 'text-zinc-900');
+        }
+        // === SISTEMA ADMIN ===
+        function checkAdmin() {
+            if (localStorage.getItem('fenixflix_admin') === 'true') {
+                document.body.classList.add('admin-mode');
+                document.getElementById('admin-icon').classList.replace('fa-lock', 'fa-lock-open');
+            } else {
+                document.body.classList.remove('admin-mode');
+                document.getElementById('admin-icon').classList.replace('fa-lock-open', 'fa-lock');
+                if(document.getElementById('view-generator').classList.contains('active')) switchView('catalog');
             }
         }
-
-        // --- MÓDULO 1: GERADOR DE JSON E GESTOR VISUAL ---
-        const gen = {
-            currentData: null,
-            editData: null, 
-            
-            init: () => {
-                const saved = localStorage.getItem('fenixflix_draft');
-                if(saved) {
-                    try {
-                        gen.currentData = JSON.parse(saved);
-                        document.getElementById('contentId').value = gen.currentData.id || '';
-                        if(gen.currentData.type) {
-                            document.querySelector(`input[name="contentType"][value="${gen.currentData.type}"]`).checked = true;
-                            gen.toggleInputs();
-                        }
-                        gen.updateDisplay(false);
-                    } catch(e) { localStorage.removeItem('fenixflix_draft'); }
+        function toggleAdmin() {
+            if (document.body.classList.contains('admin-mode')) {
+                localStorage.removeItem('fenixflix_admin');
+                showToast("Modo visualizador ativado", "info");
+            } else {
+                const pass = prompt("Palavra-passe de Administrador:");
+                if (pass === "admin123") {
+                    localStorage.setItem('fenixflix_admin', 'true');
+                    showToast("Modo Admin ativado!", "success");
+                } else if (pass !== null) {
+                    showToast("Palavra-passe incorreta", "error");
                 }
-            },
-            toggleInputs: () => {
-                const type = document.querySelector('input[name="contentType"]:checked').value;
-                document.getElementById('seasonContainer').style.display = type === 'series' ? 'block' : 'none';
-            },
-            loadExistingJson: (input) => {
-                const file = input.files[0];
-                if (!file) return;
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    try {
-                        const json = JSON.parse(e.target.result);
-                        gen.currentData = json;
-                        if (json.id) document.getElementById('contentId').value = json.id;
-                        if (json.type) {
-                            document.querySelector(`input[name="contentType"][value="${json.type}"]`).checked = true;
-                            gen.toggleInputs();
-                        }
-                        const name = file.name.replace('.json', '');
-                        if (!name.startsWith('tt')) document.getElementById('seriesName').value = name;
-                        gen.updateDisplay();
-                        showToast('JSON carregado com sucesso!');
-                    } catch (err) { showToast("Arquivo JSON inválido", "error"); }
-                };
-                reader.readAsText(file);
-            },
-            loadTxt: (input) => {
-                const file = input.files[0];
-                if (!file) return;
-                const reader = new FileReader();
-                reader.onload = e => {
-                    document.getElementById('manualLinks').value = e.target.result;
-                    showToast('TXT carregado');
-                };
-                reader.readAsText(file);
-            },
-            migrateHost: () => {
-                const input = document.getElementById('manualLinks');
-                const oldHost = "https://passing-melinda-onomed1-d0cbec40.koyeb.app";
-                const newHost = "https://hd-telegram.onrender.com"; 
-
-                if (!input.value.trim()) return showToast("Cole os links primeiro!", "warning");
-                const originalText = input.value;
-                if (!originalText.includes(oldHost)) {
-                    return showToast("Nenhum link antigo (Koyeb) encontrado.", "info");
-                }
-                const newText = originalText.split(oldHost).join(newHost);
-                input.value = newText;
-                showToast("Domínios atualizados para Render!", "success");
-            },
-            reset: () => {
-                if(confirm('Limpar todos os campos?')) {
-                    gen.currentData = null;
-                    document.getElementById('contentId').value = '';
-                    document.getElementById('seriesName').value = '';
-                    document.getElementById('manualLinks').value = '';
-                    document.getElementById('jsonOutput').value = '';
-                    document.getElementById('jsonStats').innerText = 'Vazio';
-                    document.getElementById('resultActions').classList.add('hidden');
-                    localStorage.removeItem('fenixflix_draft');
-                    showToast('Campos limpos', 'info');
-                }
-            },
-            cleanUrl: (line) => {
-                const match = line.match(/(https?:\/\/[^\s]+)/);
-                if (!match) return null;
-                let clean = match[1].trim();
-                if (!clean.includes('&d=true') && !clean.includes('?d=true')) {
-                    clean += clean.includes('?') ? '&d=true' : '?d=true';
-                }
-                return clean;
-            },
-            process: () => {
-                const id = document.getElementById('contentId').value.trim();
-                if (!id) return showToast("ID (IMDb) é obrigatório!", "error");
-
-                const type = document.querySelector('input[name="contentType"]:checked').value;
-                const baseAudio = document.getElementById('audioLanguage').value;
-                const rawText = document.getElementById('manualLinks').value;
-                
-                if (!rawText.trim()) return showToast("Cole os links primeiro.", "error");
-
-                if (!gen.currentData) gen.currentData = { "id": id, "type": type, "streams": type === 'series' ? {} : [] };
-                else { gen.currentData.id = id; gen.currentData.type = type; }
-
-                const lines = rawText.split('\n').map(l => l.trim()).filter(l => l);
-                let addedCount = 0;
-
-                if (type === 'series') {
-                    let manualSeason = document.getElementById('seasonNum').value || '1';
-                    let manualEp = parseInt(document.getElementById('startEp').value) || 1;
-                    let currentSmartSeason = null;
-                    let currentSmartEp = null;
-
-                    lines.forEach(line => {
-                        const sxeMatch = line.match(/S(\d+)\s*E(\d+)|(\d+)x(\d+)/i);
-                        if (sxeMatch) {
-                            const s = parseInt(sxeMatch[1] || sxeMatch[3]).toString();
-                            const e = parseInt(sxeMatch[2] || sxeMatch[4]).toString();
-                            currentSmartSeason = s;
-                            currentSmartEp = e;
-                            return; 
-                        }
-                        const url = gen.cleanUrl(line);
-                        if (url) {
-                            const targetSeason = currentSmartSeason || manualSeason;
-                            const targetEp = currentSmartEp || manualEp.toString();
-
-                            if (!gen.currentData.streams[targetSeason]) gen.currentData.streams[targetSeason] = {};
-                            if (!gen.currentData.streams[targetSeason][targetEp]) gen.currentData.streams[targetSeason][targetEp] = [];
-                            
-                            gen.currentData.streams[targetSeason][targetEp].push({ "url": url, "name": `${baseAudio}\nFenixflix` });
-                            addedCount++;
-                            
-                            if (currentSmartSeason) {
-                                currentSmartEp = null;
-                            } else {
-                                manualEp++;
-                            }
-                        }
-                    });
-                    if(!currentSmartSeason) document.getElementById('startEp').value = manualEp;
-                } else {
-                    if(!Array.isArray(gen.currentData.streams)) gen.currentData.streams = [];
-                    lines.forEach(line => {
-                        const url = gen.cleanUrl(line);
-                        if(url) {
-                            const count = gen.currentData.streams.filter(s => s.name.startsWith(baseAudio)).length;
-                            const finalName = count > 0 ? `${baseAudio} ${count + 1}\nFenixflix` : `${baseAudio}\nFenixflix`;
-                            gen.currentData.streams.push({ "url": url, "name": finalName });
-                            addedCount++;
-                        }
-                    });
-                }
-                gen.updateDisplay();
-                document.getElementById('manualLinks').value = '';
-                showToast(`${addedCount} links processados!`);
-            },
-            updateDisplay: (save = true) => {
-                const jsonStr = JSON.stringify(gen.currentData, null, 4);
-                document.getElementById('jsonOutput').value = jsonStr;
-                document.getElementById('resultActions').classList.remove('hidden');
-                
-                let stats = '';
-                if (gen.currentData.type === 'series') {
-                    const seasons = Object.keys(gen.currentData.streams || {}).sort((a,b)=>parseInt(a)-parseInt(b));
-                    stats = `${seasons.length} Temporada(s)`;
-                } else {
-                    stats = `${gen.currentData.streams.length} Opções`;
-                }
-                document.getElementById('jsonStats').innerText = stats;
-                
-                const fName = document.getElementById('seriesName').value.trim() || gen.currentData.id;
-                document.getElementById('fileNamePreview').innerText = `${fName}.json`;
-
-                if(save) localStorage.setItem('fenixflix_draft', jsonStr);
-            },
-            syncManualEdit: () => {
-                try {
-                    const rawValue = document.getElementById('jsonOutput').value;
-                    gen.currentData = JSON.parse(rawValue);
-                    
-                    let stats = '';
-                    if (gen.currentData.type === 'series') {
-                        const seasons = Object.keys(gen.currentData.streams || {}).sort((a,b)=>parseInt(a)-parseInt(b));
-                        stats = `${seasons.length} Temp.`;
-                    } else {
-                        stats = `${gen.currentData.streams ? gen.currentData.streams.length : 0} Opções`;
-                    }
-                    document.getElementById('jsonStats').innerText = stats;
-                    localStorage.setItem('fenixflix_draft', rawValue);
-                } catch (e) {
-                    document.getElementById('jsonStats').innerText = 'JSON Inválido';
-                }
-            },
-            copy: () => {
-                navigator.clipboard.writeText(document.getElementById('jsonOutput').value).then(() => showToast("JSON copiado!"));
-            },
-            download: () => {
-                if (!gen.currentData) return;
-                const customName = document.getElementById('seriesName').value.trim();
-                const fileName = customName ? customName : (gen.currentData.id || 'data');
-                const blob = new Blob([JSON.stringify(gen.currentData, null, 4)], { type: 'application/json' });
-                const a = document.createElement('a');
-                a.href = URL.createObjectURL(blob);
-                a.download = `${fileName}.json`;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                showToast("Download iniciado");
-            },
-
-            uploadParaBanco: async () => {
-                if (!gen.currentData) return showToast("Nenhum JSON para enviar!", "warning");
-                
-                const senha = prompt("Digite a senha do sistema para salvar no banco:");
-                if (!senha) return;
-
-                const nomeArquivo = document.getElementById('seriesName').value.trim() || gen.currentData.id;
-
-                try {
-                    const formData = new FormData();
-                    formData.append("senha", senha);
-                    formData.append("nome", nomeArquivo);
-                    formData.append("conteudo", JSON.stringify(gen.currentData));
-
-                    const response = await fetch('/upload', {
-                        method: 'POST',
-                        body: formData
-                    });
-
-                    const result = await response.json();
-                    
-                    if (response.ok) {
-                        showToast(result.mensagem, "success");
-                    } else {
-                        showToast("Erro: " + result.erro, "error");
-                    }
-                } catch (error) {
-                    showToast("Erro ao conectar com o servidor", "error");
-                }
-            },
-
-            // Gestor Visual
-            openVisualEditor: () => {
-                if (!gen.currentData || !gen.currentData.streams) {
-                    return showToast("Ainda não há links adicionados.", "warning");
-                }
-                gen.editData = JSON.parse(JSON.stringify(gen.currentData));
-                gen.renderVisualEditorContent();
-                document.getElementById('visualEditorModal').classList.remove('hidden');
-            },
-
-            closeVisualEditor: () => {
-                document.getElementById('visualEditorModal').classList.add('hidden');
-                gen.editData = null;
-            },
-
-            saveVisualEditor: () => {
-                gen.currentData = gen.editData;
-                gen.updateDisplay(); 
-                gen.closeVisualEditor();
-                showToast("Links atualizados!", "success");
-            },
-
-            updateEditData: (type, index, field, element, season, ep) => {
-                const val = element.value;
-                if (type === 'movie') {
-                    gen.editData.streams[index][field] = val;
-                } else {
-                    gen.editData.streams[season][ep][index][field] = val;
-                }
-            },
-
-            removeEditData: (type, index, season, ep) => {
-                if (type === 'movie') {
-                    gen.editData.streams.splice(index, 1);
-                } else {
-                    gen.editData.streams[season][ep].splice(index, 1);
-                    if (gen.editData.streams[season][ep].length === 0) {
-                        delete gen.editData.streams[season][ep];
-                    }
-                    if (Object.keys(gen.editData.streams[season]).length === 0) {
-                        delete gen.editData.streams[season];
-                    }
-                }
-                gen.renderVisualEditorContent();
-            },
-
-            renderVisualEditorContent: () => {
-                const container = document.getElementById('visualEditorContent');
-                let html = '';
-
-                if (gen.editData.type === 'movie') {
-                    if (!gen.editData.streams || gen.editData.streams.length === 0) {
-                        html = '<p class="text-zinc-600 text-center text-sm py-6">Nenhum link encontrado.</p>';
-                    } else {
-                        gen.editData.streams.forEach((stream, index) => {
-                            html += `
-                            <div class="bg-zinc-900 p-3.5 rounded-xl border border-zinc-800 flex flex-col md:flex-row gap-3 items-center group">
-                                <div class="bg-zinc-950 text-zinc-500 w-10 h-10 rounded-lg flex justify-center items-center shrink-0 border border-zinc-800"><i class="fa-solid fa-film text-xs"></i></div>
-                                <div class="flex-grow flex flex-col md:flex-row gap-3 w-full">
-                                    <textarea rows="2" class="input-unified p-2.5 text-xs rounded-lg w-full md:w-1/3 custom-scrollbar" placeholder="Nome" onchange="gen.updateEditData('movie', ${index}, 'name', this)">${escapeHTML(stream.name)}</textarea>
-                                    <input type="text" class="input-unified p-2.5 text-xs rounded-lg font-mono w-full md:w-2/3" placeholder="URL" value="${escapeHTML(stream.url)}" onchange="gen.updateEditData('movie', ${index}, 'url', this)">
-                                </div>
-                                <button onclick="gen.removeEditData('movie', ${index})" class="bg-zinc-950 border border-zinc-800 hover:border-red-900 hover:bg-red-950 text-zinc-500 hover:text-red-400 w-full md:w-10 h-10 rounded-lg transition shrink-0"><i class="fa-solid fa-trash text-xs"></i></button>
-                            </div>`;
-                        });
-                    }
-                } else {
-                    let hasItems = false;
-                    const seasons = Object.keys(gen.editData.streams || {}).sort((a,b) => parseInt(a)-parseInt(b));
-                    
-                    seasons.forEach(season => {
-                        const eps = Object.keys(gen.editData.streams[season]).sort((a,b) => parseInt(a)-parseInt(b));
-                        
-                        html += `<div class="mt-6 mb-3 px-1"><span class="text-zinc-400 text-xs font-semibold uppercase tracking-wider">Temporada ${season}</span></div>`;
-                        
-                        eps.forEach(ep => {
-                            gen.editData.streams[season][ep].forEach((stream, index) => {
-                                hasItems = true;
-                                html += `
-                                <div class="bg-zinc-900 p-3.5 rounded-xl border border-zinc-800 flex flex-col md:flex-row gap-3 items-center group">
-                                    <div class="bg-zinc-950 text-zinc-400 border border-zinc-800 font-mono font-medium w-10 h-10 rounded-lg flex justify-center items-center text-xs shrink-0">E${ep.padStart(2,'0')}</div>
-                                    <div class="flex-grow flex flex-col md:flex-row gap-3 w-full">
-                                        <textarea rows="2" class="input-unified p-2.5 text-xs rounded-lg w-full md:w-1/3 custom-scrollbar" placeholder="Nome" onchange="gen.updateEditData('series', ${index}, 'name', this, '${season}', '${ep}')">${escapeHTML(stream.name)}</textarea>
-                                        <input type="text" class="input-unified p-2.5 text-xs rounded-lg font-mono w-full md:w-2/3" placeholder="URL" value="${escapeHTML(stream.url)}" onchange="gen.updateEditData('series', ${index}, 'url', this, '${season}', '${ep}')">
-                                    </div>
-                                    <button onclick="gen.removeEditData('series', ${index}, '${season}', '${ep}')" class="bg-zinc-950 border border-zinc-800 hover:border-red-900 hover:bg-red-950 text-zinc-500 hover:text-red-400 w-full md:w-10 h-10 rounded-lg transition shrink-0"><i class="fa-solid fa-trash text-xs"></i></button>
-                                </div>`;
-                            });
-                        });
-                    });
-
-                    if (!hasItems) {
-                        html = '<p class="text-zinc-600 text-center text-sm py-6">Nenhum episódio encontrado.</p>';
-                    }
-                }
-
-                container.innerHTML = html;
             }
-        };
-        gen.init();
-
-        // --- MÓDULO 2: CATÁLOGO ---
+            checkAdmin();
+            cat.renderFiltered(); 
+        }
+        checkAdmin();
+        // === CATÁLOGO COM DADOS DO SERVIDOR GO E TMDB ===
         const cat = {
             allItems: [],
             filteredItems: [],
-            currentSort: 'newest',
             
             init: async () => {
-                cat.setLoading(true);
-                cat.allItems = [];
-                document.getElementById('gridContainer').innerHTML = '';
-
+                const grid = document.getElementById('gridContainer');
+                
+                grid.innerHTML = `
+                <div class="col-span-full flex flex-col items-center justify-center py-12 text-zinc-500 text-sm">
+                    <i class="fa-solid fa-circle-notch fa-spin text-3xl mb-4 text-indigo-500"></i>
+                    <p>A ligar à base de dados local...</p>
+                </div>`;
+                
                 try {
-                    const response = await fetch('/api/catalog');
-                    if (!response.ok) throw new Error("Falha na API");
-                    const data = await response.json();
-
-                    cat.allItems = data.map((item, index) => {
-                        item.loaded = true;
-                        item.recentOrder = typeof item.orderIndex !== 'undefined' ? item.orderIndex : 999999;
-                        item.seriesData = { totalExpected: 0, foundCount: 0, missing: 0, percent: 0, foundSet: new Set(), seasonMap: {} };
-                        
-                        if (item.type === 'series') {
-                            if (item.cinemetaVideos) {
-                                let expectedReal = 0; 
-                                item.cinemetaVideos.forEach(v => {
-                                    if (v.season > 0) { 
-                                        expectedReal++;
-                                        if(!item.seriesData.seasonMap[v.season]) item.seriesData.seasonMap[v.season] = { found: 0, expected: 0 };
-                                        item.seriesData.seasonMap[v.season].expected++;
-                                    }
-                                });
-                                item.seriesData.totalExpected = expectedReal; 
-                            }   
-
-                            const newStreams = [];
-                            const foundIds = new Set();
-                            
-                            if (item.streams && !Array.isArray(item.streams)) {
-                                Object.keys(item.streams).forEach(seasonNum => {
-                                    const seasonObj = item.streams[seasonNum];
-                                    if(!item.seriesData.seasonMap[seasonNum]) item.seriesData.seasonMap[seasonNum] = { found: 0, expected: 0 };
-                                    item.seriesData.seasonMap[seasonNum].found = Object.keys(seasonObj).length;
-
-                                    Object.keys(seasonObj).forEach(epNum => {
-                                        const sources = seasonObj[epNum];
-                                        if (sources && sources.length > 0) {
-                                            const s = seasonNum.padStart(2, '0');
-                                            const e = epNum.padStart(2, '0');
-                                            const epId = `S${s}E${e}`;
-                                            
-                                            sources.forEach((source, index) => {
-                                                const linkName = source.name || source.description || `Opção ${index + 1}`;
-                                                newStreams.push({ name: `${epId} - ${linkName}`, url: source.url });
-                                            });
-                                            foundIds.add(epId);
-                                        }
-                                    });
-                                });
-                            }
-                            item.streams = newStreams;
-                            item.seriesData.foundSet = foundIds;
-                            item.seriesData.foundCount = foundIds.size;
-                            const total = item.seriesData.totalExpected;
-                            const found = item.seriesData.foundCount;
-                            item.seriesData.missing = Math.max(0, total - found);
-                            item.seriesData.percent = total > 0 ? Math.round((found / total) * 100) : 0;
-                        } else {
-                            if (!item.streams) item.streams = [];
-                        }
-
-                        return item;
-                    });
-
-                    cat.updateGlobalStats();
-                    cat.filter('all');
-
-                } catch (error) {
-                    showToast("Erro ao carregar o catálogo", "error");
-                } finally {
-                    cat.setLoading(false);
+                    const res = await fetch('/api/catalog');
+                    
+                    if (!res.ok) throw new Error("Erro na rede ao tentar buscar catálogo");
+                    
+                    const textContent = await res.text();
+                    if(textContent.trim().startsWith('<')) {
+                        throw new Error("Está a correr a versão antiga do main.go!");
+                    }
+                    const jsonFiles = JSON.parse(textContent) || [];
+                    
+                    cat.allItems = jsonFiles;
+                    cat.filteredItems = [...cat.allItems];
+                    cat.updateStats();
+                    cat.renderFiltered();
+                    cat.enrichWithTMDB();
+                } catch (e) {
+                    console.error(e);
+                    grid.innerHTML = `
+                    <div class="col-span-full flex flex-col items-center justify-center py-12 text-red-400 text-sm bg-red-950/20 rounded-2xl border border-red-900/50 p-8 shadow-lg">
+                        <i class="fa-solid fa-triangle-exclamation text-4xl mb-4 text-red-500"></i>
+                        <h3 class="text-xl font-bold text-white mb-2">Ligação Falhou</h3>
+                        <p class="text-center max-w-lg text-red-300 leading-relaxed">
+                            O sistema travou no carregamento pelo seguinte motivo:<br><br>
+                            1. Abriu o ficheiro dando dois cliques (está a usar <b>file:///...</b>). <b>Precisa</b> de aceder via <b>http://localhost:8080</b> no navegador.<br><br>
+                            2. O seu servidor Go (<b>main.go</b>) não está a correr no terminal, ou ainda está a usar o ficheiro da versão antiga.
+                        </p>
+                    </div>`;
                 }
             },
-
+            updateStats: () => {
+                let movies = 0, series = 0, totalLinks = 0;
+                cat.allItems.forEach(item => {
+                    if (item.type === 'movie') {
+                        movies++;
+                        if (item.streams) totalLinks += item.streams.length;
+                    } else if (item.type === 'series') {
+                        series++;
+                        if (item.streams) {
+                            Object.keys(item.streams).forEach(s => {
+                                Object.keys(item.streams[s]).forEach(e => {
+                                    if(Array.isArray(item.streams[s][e])) totalLinks += item.streams[s][e].length;
+                                });
+                            });
+                        }
+                    }
+                });
+                document.getElementById('countTotal').innerText = cat.allItems.length;
+                document.getElementById('countMovies').innerText = movies;
+                document.getElementById('countSeries').innerText = series;
+                document.getElementById('countLinks').innerText = totalLinks;
+            },
+            enrichWithTMDB: async () => {
+                for (let i = 0; i < cat.allItems.length; i++) {
+                    const item = cat.allItems[i];
+                    if (item.poster) continue;
+                    const type = item.type === 'movie' ? 'movie' : 'tv';
+                    let gotPoster = false;
+                    // Tenta TMDB primeiro (converte IMDb → TMDB automaticamente no backend)
+                    try {
+                        const res = await fetch(`/api/tmdb?id=${item.id}&type=${type}`);
+                        if (res.ok) {
+                            const tmdbData = await res.json();
+                            if (tmdbData.poster_path) {
+                                item.poster = `https://image.tmdb.org/t/p/w500${tmdbData.poster_path}`;
+                                item.title = tmdbData.title || tmdbData.name || item.title || item.id;
+                                item.year = (tmdbData.release_date || tmdbData.first_air_date || "").split('-')[0];
+                                gotPoster = true;
+                            }
+                        }
+                    } catch(e) {}
+                    // Fallback: Cinemeta se TMDB não tiver resultado ou chave não configurada
+                    if (!gotPoster && item.id) {
+                        try {
+                            const cinType = item.type === 'movie' ? 'movie' : 'series';
+                            const res = await fetch(`https://v3-cinemeta.strem.io/meta/${cinType}/${item.id}.json`);
+                            if (res.ok) {
+                                const cinData = await res.json();
+                                const meta = cinData.meta;
+                                if (meta) {
+                                    if (meta.poster) { item.poster = meta.poster; gotPoster = true; }
+                                    if (!item.title && meta.name) item.title = meta.name;
+                                    if (!item.year && meta.year) item.year = String(meta.year);
+                                }
+                            }
+                        } catch(e) {}
+                    }
+                    if (gotPoster || item.title) {
+                        const imgEl = document.getElementById(`img-${item.id}`);
+                        if (imgEl && item.poster) imgEl.src = item.poster;
+                        const titleEl = document.getElementById(`title-${item.id}`);
+                        if (titleEl && item.title) titleEl.innerText = item.title;
+                    }
+                }
+            },
             search: (query) => {
                 const term = query.toLowerCase();
-                if (!term) { cat.filter('all'); return; }
-                cat.filteredItems = cat.allItems.filter(item => 
-                    (item.title && item.title.toLowerCase().includes(term)) || 
-                    (item.id && item.id.includes(term))
-                );
-                cat.sort(cat.currentSort);
-            },
-
-            sort: (mode) => {
-                cat.currentSort = mode;
-                if (mode === 'newest') cat.filteredItems.sort((a, b) => a.recentOrder - b.recentOrder);
-                else if (mode === 'oldest') cat.filteredItems.sort((a, b) => b.recentOrder - a.recentOrder);
-                else if (mode === 'year') cat.filteredItems.sort((a, b) => { const yA = parseInt(a.year) || 0; const yB = parseInt(b.year) || 0; return yB - yA; });
-                else if (mode === 'name') cat.filteredItems.sort((a, b) => (a.title||a.id).localeCompare(b.title||b.id));
+                cat.filteredItems = cat.allItems.filter(i => (i.title||"").toLowerCase().includes(term) || (i.id||"").toLowerCase().includes(term) || (i.fileName||"").toLowerCase().includes(term));
                 cat.renderFiltered();
             },
-
-            editInGenerator: (id) => {
-                const item = cat.allItems.find(i => i.id === id);
-                if (!item) return;
-
-                let exportData = {
-                    id: item.id,
-                    type: item.type,
-                    streams: item.type === 'series' ? {} : JSON.parse(JSON.stringify(item.streams || []))
-                };
-
-                if (item.type === 'series' && Array.isArray(item.streams)) {
-                    item.streams.forEach(str => {
-                        const match = str.name.match(/S(\d+)E(\d+)/i);
-                        if (match) {
-                            const s = parseInt(match[1]).toString();
-                            const e = parseInt(match[2]).toString();
-                            if(!exportData.streams[s]) exportData.streams[s] = {};
-                            if(!exportData.streams[s][e]) exportData.streams[s][e] = [];
-                            
-                            let nomeLimpo = str.name.replace(/S\d+E\d+\s*(-\s*)?/i, '').trim();
-                            exportData.streams[s][e].push({ name: nomeLimpo, url: str.url });
-                        }
-                    });
-                }
-
-                gen.currentData = exportData;
-                document.getElementById('contentId').value = exportData.id;
-                document.getElementById('seriesName').value = item.title || item.id || '';
+            filter: (type) => {
+                document.querySelectorAll('.filter-btn').forEach(b => { b.classList.remove('bg-white', 'text-zinc-900'); b.classList.add('bg-zinc-900', 'text-zinc-400'); });
+                document.getElementById(`btn-${type}`).classList.add('bg-white', 'text-zinc-900');
                 
-                const typeRadio = document.querySelector(`input[name="contentType"][value="${exportData.type}"]`);
+                if (type === 'all') cat.filteredItems = [...cat.allItems];
+                else cat.filteredItems = cat.allItems.filter(i => i.type === type);
+                cat.renderFiltered();
+            },
+            renderFiltered: () => {
+                const container = document.getElementById('gridContainer');
+                if (!cat.filteredItems.length) { container.innerHTML = '<div class="col-span-full text-center text-zinc-600 py-12 text-sm">Nenhum título encontrado.</div>'; return; }
+                
+                const isAdmin = document.body.classList.contains('admin-mode');
+                container.innerHTML = cat.filteredItems.map(item => {
+                    const posterHtml = `<img id="img-${item.id}" src="${item.poster || 'data:image/svg+xml;utf8,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22%3E%3C/svg%3E'}" class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105 bg-zinc-900">`;
+                    
+                    let adminButtons = '';
+                    if (isAdmin) {
+                        adminButtons = `
+                        <div class="absolute top-2 left-2 flex flex-col gap-1.5 z-30 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button onclick="event.stopPropagation(); cat.editItem('${item.fileName}')" class="bg-indigo-600 text-white p-2 rounded-lg border border-indigo-500 shadow hover:bg-indigo-500 transition"><i class="fa-solid fa-pen text-[10px]"></i></button>
+                            <button onclick="event.stopPropagation(); cat.deleteItem('${item.fileName}')" class="bg-red-950 text-red-400 p-2 rounded-lg border border-red-900 shadow hover:bg-red-900 hover:text-red-300 transition"><i class="fa-solid fa-trash text-[10px]"></i></button>
+                        </div>`;
+                    }
+                    // A rota estática para visualizar o JSON
+                    const jsonUrl = `/json/${item.fileName}`;
+                    return `
+                    <div class="group bg-zinc-900 rounded-2xl overflow-hidden border border-zinc-800 hover:border-zinc-700 transition-all flex flex-col h-full cursor-pointer relative" onclick="cat.openLinks('${item.id}')">
+                        ${adminButtons}
+                        <a href="${jsonUrl}" target="_blank" onclick="event.stopPropagation()" class="absolute top-2 right-2 bg-zinc-800/80 backdrop-blur text-white p-1.5 rounded-lg border border-zinc-700 shadow hover:bg-zinc-700 transition z-30 opacity-0 group-hover:opacity-100" title="Ver JSON puro">
+                            <i class="fa-solid fa-file-code text-[10px]"></i>
+                        </a>
+                        <div class="aspect-[2/3] bg-zinc-950 relative overflow-hidden">${posterHtml}</div>
+                        <div class="p-3.5 flex flex-col flex-grow bg-zinc-900">
+                            <h3 id="title-${item.id}" class="font-medium text-zinc-200 leading-snug mb-1 line-clamp-2 text-xs">${item.title || item.fileName || item.id}</h3>
+                            <div class="mt-auto pt-2 text-[10px] text-zinc-500 flex justify-between font-mono">
+                                <span>${item.type === 'movie' ? 'FILME' : 'SÉRIE'}</span>
+                            </div>
+                        </div>
+                    </div>`;
+                }).join('');
+            },
+            editItem: (fileName) => {
+                const item = cat.allItems.find(i => i.fileName === fileName);
+                if (!item) return;
+                
+                gen.currentData = item;
+                document.getElementById('fileNameOriginal').value = fileName;
+                document.getElementById('seriesName').value = fileName.replace('.json', '');
+                document.getElementById('contentId').value = item.id || '';
+                
+                const typeRadio = document.querySelector(`input[name="contentType"][value="${item.type}"]`);
                 if(typeRadio) typeRadio.checked = true;
                 
                 gen.toggleInputs();
-                gen.updateDisplay(true);
+                gen.updateDisplay();
                 switchView('generator');
-                showToast(`Pronto para editar: ${item.title || item.id}`);
+                showToast("Pronto para editar", "info");
             },
-
-            downloadJson: (id) => {
-                const item = cat.allItems.find(i => i.id === id);
-                if (!item) return;
-
-                let exportData = {
-                    id: item.id,
-                    type: item.type,
-                    streams: item.type === 'series' ? {} : (item.streams || [])
-                };
-
-                if (item.type === 'series' && Array.isArray(item.streams)) {
-                    item.streams.forEach(str => {
-                        const match = str.name.match(/S(\d+)E(\d+)/i);
-                        if (match) {
-                            const s = parseInt(match[1]).toString();
-                            const e = parseInt(match[2]).toString();
-                            if(!exportData.streams[s]) exportData.streams[s] = {};
-                            if(!exportData.streams[s][e]) exportData.streams[s][e] = [];
-                            
-                            let nomeLimpo = str.name.replace(/S\d+E\d+\s*(-\s*)?/i, '').trim();
-                            
-                            exportData.streams[s][e].push({ name: nomeLimpo, url: str.url });
-                        }
-                    });
-                }
-
-                const blob = new Blob([JSON.stringify(exportData, null, 4)], { type: 'application/json' });
-                const a = document.createElement('a');
-                a.href = URL.createObjectURL(blob);
-                a.download = `${item.title ? item.title.replace(/[^a-z0-9]/gi, '_').toLowerCase() : item.id}.json`;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-            },
-
-            deleteItem: async (id) => {
-                const senha = prompt(`Digite a senha do sistema para apagar o ficheiro ${id}:`);
-                if (!senha) return;
-                
-                if(!confirm(`Tem a certeza absoluta que quer apagar ${id}? Esta ação é irreversível.`)) return;
-
+            deleteItem: async (fileName) => {
+                if(!confirm(`Tem a certeza que deseja apagar o ficheiro ${fileName} do servidor?`)) return;
                 try {
-                    const response = await fetch('/api/delete', {
+                    const res = await fetch('/api/delete', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ id: id, senha: senha })
+                        body: JSON.stringify({ fileName })
                     });
-                    
-                    const data = await response.json();
-                    
-                    if(response.ok && data.sucesso) {
-                        cat.allItems = cat.allItems.filter(i => i.id !== id);
-                        
-                        const btnMissing = document.getElementById('btn-missing_all');
-                        if (btnMissing && btnMissing.classList.contains('bg-white')) cat.filter('missing_all');
-                        else cat.filter('all');
-                        
-                        cat.updateGlobalStats();
-                        showToast(`${id} removido!`, 'success');
-                    } else {
-                        showToast(`Erro: ${data.erro}`, 'error');
-                    }
-                } catch(e) { showToast('Erro de conexão ao tentar apagar', 'error'); }
+                    if (res.ok) {
+                        showToast("Ficheiro apagado", "success");
+                        cat.init();
+                    } else showToast("Erro ao apagar", "error");
+                } catch(e) { showToast("Erro de rede", "error"); }
             },
-
-            renderCard: (item) => {
-                const posterHtml = item.poster ? `<img src="${item.poster}" alt="${item.title || item.id}" loading="lazy" class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105 opacity-90 group-hover:opacity-100">` : `<div class="flex flex-col items-center justify-center h-full bg-zinc-900 text-zinc-700"><i class="fa-solid fa-image text-3xl mb-2"></i><span class="text-[10px]">${item.id}</span></div>`;
-
-                let footerHtml = '';
-                if (item.type === 'series') {
-                    const { foundCount, totalExpected, missing, percent } = item.seriesData;
-                    let barColor = 'bg-zinc-500';
-                    let statusText = `<span class="text-zinc-500">Analizando</span>`;
-
-                    if (item.loaded) {
-                        if (missing === 0 && totalExpected > 0) { barColor = 'bg-emerald-500'; statusText = `<span class="text-emerald-500 font-semibold text-[10px]">Completo</span>`; } 
-                        else if (totalExpected > 0) { barColor = 'bg-amber-500'; statusText = `<span class="text-amber-500 font-semibold text-[10px]">Faltam ${missing}</span>`; } 
-                        else { statusText = `<span class="text-zinc-400 font-semibold text-[10px]">${foundCount} eps</span>`; }
-                    }
-                    footerHtml = `<div class="mt-2.5"><div class="flex justify-between items-end mb-1.5">${statusText}<span class="text-zinc-500 text-[10px] font-mono">${foundCount}/${totalExpected || '?'}</span></div><div class="h-1 w-full bg-zinc-800 rounded-full overflow-hidden"><div class="h-full ${barColor} progress-fill" style="width: ${item.loaded ? percent : 5}%"></div></div></div>`;
-                } else {
-                    const streamCount = item.streams ? item.streams.length : 0;
-                    const hasLink = streamCount > 0;
-                    footerHtml = `<div class="mt-auto pt-2.5 flex justify-between items-center"><span class="text-[10px] text-zinc-500 font-mono">${item.year || ''}</span><span class="${hasLink ? 'text-zinc-300' : 'text-red-400'} text-[10px] font-medium flex items-center gap-1.5">${hasLink ? streamCount + ' opções' : 'Sem links'}</span></div>`;
-                }
-
-                return `
-                <div class="group bg-zinc-900 rounded-2xl overflow-hidden border border-zinc-800 hover:border-zinc-700 transition-all flex flex-col h-full cursor-pointer relative">
-                    <div class="absolute top-2 left-2 flex flex-col gap-1.5 z-30 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onclick="event.stopPropagation(); cat.editInGenerator('${item.id}')" class="bg-zinc-900/90 text-zinc-300 hover:text-white p-2 rounded-lg backdrop-blur-md border border-zinc-700/50 transition"><i class="fa-solid fa-pen text-[10px]"></i></button>
-                        <button onclick="event.stopPropagation(); cat.downloadJson('${item.id}')" class="bg-zinc-900/90 text-zinc-300 hover:text-white p-2 rounded-lg backdrop-blur-md border border-zinc-700/50 transition"><i class="fa-solid fa-download text-[10px]"></i></button>
-                        <button onclick="event.stopPropagation(); cat.deleteItem('${item.id}')" class="bg-zinc-900/90 text-red-400 hover:text-red-300 p-2 rounded-lg backdrop-blur-md border border-zinc-700/50 transition"><i class="fa-solid fa-trash text-[10px]"></i></button>
-                    </div>
-                    <div class="aspect-[2/3] bg-zinc-950 relative overflow-hidden" onclick="cat.openLinks('${item.id}')">
-                        ${posterHtml}
-                    </div>
-                    <div class="p-3.5 flex flex-col flex-grow bg-zinc-900" onclick="cat.openLinks('${item.id}')">
-                        <h3 class="font-medium text-zinc-200 leading-snug mb-1 line-clamp-2 text-xs" title="${item.title || item.id}">${item.title || item.id}</h3>
-                        ${footerHtml}
-                    </div>
-                </div>`;
-            },
-
-            filter: (type) => {
-                document.querySelectorAll('.filter-btn').forEach(b => {
-                    b.classList.remove('bg-white', 'text-zinc-900', 'shadow-sm');
-                    b.classList.add('bg-zinc-900', 'border-zinc-800');
-                    if (b.id === 'btn-missing_all') {
-                        b.classList.add('text-amber-500'); 
-                    } else {
-                        b.classList.add('text-zinc-400');
-                    }
-                });
-
-                const activeBtn = document.getElementById(`btn-${type}`);
-                if(activeBtn) {
-                    activeBtn.classList.remove('bg-zinc-900', 'text-zinc-400', 'text-amber-500');
-                    activeBtn.classList.add('bg-white', 'text-zinc-900', 'shadow-sm');
-                }
-
-                if (type === 'all') {
-                    cat.filteredItems = [...cat.allItems]; 
-                } else if (type === 'missing_all') {
-                    cat.filteredItems = cat.allItems.filter(i => {
-                        if (i.type === 'movie') return !i.streams || i.streams.length === 0;
-                        if (i.type === 'series') return i.seriesData.missing > 0;
-                        return false;
-                    });
-                } else {
-                    cat.filteredItems = cat.allItems.filter(i => i.type === type);
-                }
-
-                cat.sort(cat.currentSort);
-            },
-
-            renderFiltered: () => {
-                const container = document.getElementById('gridContainer');
-                if(!cat.filteredItems.length) { container.innerHTML = '<div class="col-span-full text-center text-zinc-600 py-12 text-sm">Nenhum resultado.</div>'; return; }
-                container.innerHTML = cat.filteredItems.map(item => cat.renderCard(item)).join('');
-            },
-
-            updateGlobalStats: () => {
-                document.getElementById('countMovies').innerText = cat.allItems.filter(i => i.type === 'movie').length;
-                document.getElementById('countSeries').innerText = cat.allItems.filter(i => i.type === 'series').length;
-                
-                let totalEpsPossuidos = 0, totalFaltantes = 0;
-                cat.allItems.forEach(i => {
-                    if(i.type === 'series') { totalEpsPossuidos += i.seriesData.foundCount; totalFaltantes += i.seriesData.missing; }
-                    if(i.type === 'movie') { if(!i.streams || i.streams.length === 0) totalFaltantes++; }
-                });
-
-                document.getElementById('countTotalEps').innerText = totalEpsPossuidos;
-                const missEl = document.getElementById('countMissing');
-                missEl.innerText = totalFaltantes;
-            },
-
-            setLoading: (isLoading) => {
-                const el = document.getElementById('apiStatus');
-                if(!el) return;
-                if (isLoading) el.innerHTML = '<span class="loader w-3 h-3"></span>';
-                else el.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Conectado`;
-            },
-
-            uploadEmMassa: async (input) => {
-                const files = input.files;
-                if (!files || files.length === 0) return;
-
-                const senha = prompt(`Vai enviar ${files.length} ficheiro(s) JSON. Digite a senha do sistema:`);
-                if (!senha) {
-                    input.value = ""; 
-                    return;
-                }
-
-                let sucesso = 0;
-                let erro = 0;
-
-                showToast(`A processar ${files.length} ficheiros... aguarde.`, 'info');
-
-                for (let i = 0; i < files.length; i++) {
-                    const file = files[i];
-                    try {
-                        const text = await file.text();
-                        const json = JSON.parse(text);
-
-                        let nomeArquivo = file.name.replace('.json', '');
-
-                        const formData = new FormData();
-                        formData.append("senha", senha);
-                        formData.append("nome", nomeArquivo);
-                        formData.append("conteudo", JSON.stringify(json));
-
-                        const response = await fetch('/upload', {
-                            method: 'POST',
-                            body: formData
-                        });
-
-                        if (response.ok) {
-                            sucesso++;
-                        } else {
-                            erro++;
-                        }
-                    } catch (error) {
-                        erro++;
-                        console.error(`Erro no ficheiro ${file.name}:`, error);
-                    }
-                }
-
-                input.value = ""; 
-                showToast(`Upload concluído! Sucesso: ${sucesso} | Erros: ${erro}`, erro > 0 ? 'warning' : 'success');
-                
-                cat.init();
-            },
-
             openLinks: (id) => {
                 const item = cat.allItems.find(i => i.id === id);
                 if (!item) return;
                 
-                document.getElementById('modalTitle').innerText = item.title || item.id;
-                
-                document.getElementById('btnModalEdit').onclick = () => {
-                    cat.closeModal();
-                    cat.editInGenerator(item.id);
-                };
-
-                const statsEl = document.getElementById('modalStats');
+                document.getElementById('modalTitle').innerText = item.title || item.fileName || item.id;
                 const content = document.getElementById('modalContent');
                 content.innerHTML = '';
-
-                if (item.type === 'series') {
-                    const { foundCount, totalExpected, missing } = item.seriesData;
-                    statsEl.innerHTML = `<span class="text-zinc-400">Disponível: <b class="text-white">${foundCount}</b> / ${totalExpected || '?'}</span>${missing > 0 ? `<span class="text-amber-500 ml-3">Faltam ${missing}</span>` : `<span class="text-emerald-500 ml-3">Completo</span>`}`;
-                    
-                    if (item.seriesData.seasonMap && Object.keys(item.seriesData.seasonMap).length > 0) {
-                        const seasonsContainer = document.createElement('div');
-                        seasonsContainer.className = "flex flex-wrap gap-2 mb-6";
-                        Object.keys(item.seriesData.seasonMap).sort((a,b) => parseInt(a)-parseInt(b)).forEach(s => {
-                            const data = item.seriesData.seasonMap[s];
-                            const isComplete = data.found >= data.expected && data.expected > 0;
-                            if (s == "0" && data.expected === 0) return;
-                            seasonsContainer.innerHTML += `<div class="bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-center flex flex-col min-w-[70px]"><span class="text-[9px] uppercase tracking-wider text-zinc-500 font-semibold mb-1">T${s}</span><span class="font-mono text-xs ${isComplete ? 'text-emerald-400' : 'text-zinc-300'}">${data.found}/${data.expected || '?'}</span></div>`;
-                        });
-                        content.appendChild(seasonsContainer);
-                    }
-                } else { statsEl.innerHTML = `<span class="text-zinc-500">${item.year || ''} • Filme</span>`; }
-
-                if (!item.streams || item.streams.length === 0) {
-                    content.innerHTML = '<div class="text-zinc-600 text-center py-10 text-sm">Nenhum link encontrado.</div>';
-                } else {
-                    // SUBSTITUÍDO: Agora não renderiza os links! Mostra apenas uma mensagem informativa
-                    content.innerHTML = `
-                    <div class="flex flex-col items-center justify-center py-12 text-zinc-500">
-                        <i class="fa-solid fa-eye-slash text-3xl mb-3 opacity-50"></i>
-                        <p class="text-sm font-medium">Links Ocultos</p>
-                        <p class="text-xs text-zinc-600 mt-1 text-center max-w-xs">Para manter a interface limpa, os links não são exibidos aqui.<br>Feche esta janela e clique no ícone do Lápis (Editar) para os ver.</p>
-                    </div>`;
-                }
-                document.getElementById('modalTotalLinks').innerText = `Oculto`;
-                document.getElementById('linkModal').classList.remove('hidden');
-            },
-            closeModal: () => { document.getElementById('linkModal').classList.add('hidden'); }
-        };
-
-        // --- MÓDULO 3: PROCESSADOR DE PEDIDOS ---
-        const reqProcessor = {
-            parsedItems: new Map(),
-            totalLinesRead: 0,
-            tmdbKey: "eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJlZTBmMzJmNzY5Mzc0YTkzYTI0ZmNiYzcyMWRlODYzNCIsIm5iZiI6MTc1NjA2MzM2NC4yMzksInN1YiI6IjY4YWI2Njg0ZDAyMjdhYTVlMjlkYjE2MSIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.z1hG61Z5RCvn6qEZj60sHxrDZ0hR8QQi4rt18erzF-w",
-
-            clearData: () => {
-                reqProcessor.parsedItems.clear();
-                reqProcessor.totalLinesRead = 0;
-                
-                reqProcessor.updateUI();
-                document.getElementById('req-results-container').innerHTML = `<div class="text-center py-12 text-zinc-600"><p class="text-sm font-medium">Memória limpa.</p></div>`;
-                document.getElementById('btn-download-json').classList.add('hidden');
-                document.getElementById('btn-download-txt').classList.add('hidden');
-                document.getElementById('btn-download-csv')?.classList.add('hidden');
-                document.getElementById('req-search-row')?.classList.add('hidden');
-                document.getElementById('req-loading-status').innerText = `Pronto`;
-                showToast("Lista limpa");
-            },
-
-            handleUpload: (input) => {
-                const file = input.files[0];
-                if (!file) return;
-
-                document.getElementById('req-loading-status').innerHTML = `<span class="loader inline-block w-3 h-3 mr-2 border-zinc-500 border-t-zinc-300"></span> Lendo TXT`;
-                
-                const reader = new FileReader();
-                reader.onload = async (e) => {
-                    const text = e.target.result;
-                    const lines = text.split('\n');
-                    let newItemsAdded = 0;
-                    
-                    for (const line of lines) {
-                        if (line.trim() === '') continue;
-                        reqProcessor.totalLinesRead++;
-                        
-                        const match = line.match(/(movie|series):\s*(tt\d+)(?:\s*\((.*?)\))?/);
-                        if (match) {
-                            const type = match[1];
-                            const imdbId = match[2];
-                            const epInfo = match[3];
-
-                            if (!reqProcessor.parsedItems.has(imdbId)) {
-                                reqProcessor.parsedItems.set(imdbId, {
-                                    id: imdbId,
-                                    type: type,
-                                    title: "Buscando...",
-                                    missingEps: new Set(),
-                                    count: 0
-                                });
-                                newItemsAdded++;
-                            }
-
-                            const cur = reqProcessor.parsedItems.get(imdbId);
-                            cur.count = (cur.count || 0) + 1;
-
-                            if (type === 'series' && epInfo) {
-                                cur.missingEps.add(epInfo);
-                            }
-                        }
-                    }
-
-                    reqProcessor.updateUI();
-                    
-                    if (newItemsAdded > 0 || Array.from(reqProcessor.parsedItems.values()).some(i => i.title === "Buscando...")) {
-                        reqProcessor.fetchTitlesFromTMDB(); 
-                    } else {
-                        document.getElementById('req-loading-status').innerText = `Atualizado`;
-                        document.getElementById('btn-download-json').classList.remove('hidden');
-                        document.getElementById('btn-download-txt').classList.remove('hidden');
-                        document.getElementById('btn-download-csv')?.classList.remove('hidden');
-                    }
-                    
-                    reqProcessor.renderList();
-                    input.value = ""; 
-                };
-                reader.readAsText(file);
-            },
-
-            handleJsonUpload: (input) => {
-                const file = input.files[0];
-                if (!file) return;
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    try {
-                        const data = JSON.parse(e.target.result);
-                        reqProcessor.totalLinesRead = data.totalLidos || 0;
-                        
-                        reqProcessor.parsedItems.clear();
-                        if (data.items) {
-                            data.items.forEach(item => {
-                                reqProcessor.parsedItems.set(item.id, {
-                                    id: item.id,
-                                    type: item.type,
-                                    title: item.title,
-                                    missingEps: new Set(item.missingEps || []) 
+                let links = [];
+                if (item.type === 'movie') links = item.streams || [];
+                else {
+                    if (item.streams) {
+                        Object.keys(item.streams).forEach(s => {
+                            Object.keys(item.streams[s]).forEach(e => {
+                                item.streams[s][e].forEach(stream => {
+                                    links.push({ name: `S${s.padStart(2,'0')}E${e.padStart(2,'0')} - ${stream.name}`, url: stream.url });
                                 });
                             });
-                        }
-                        
-                        reqProcessor.updateUI();
-                        reqProcessor.renderList();
-                        
-                        if(reqProcessor.parsedItems.size > 0) {
-                             document.getElementById('btn-download-json').classList.remove('hidden');
-                             document.getElementById('btn-download-txt').classList.remove('hidden');
-                             document.getElementById('btn-download-csv')?.classList.remove('hidden');
-                             document.getElementById('req-loading-status').innerText = `Restaurado`;
-                        }
-                    } catch (err) {
-                        showToast("JSON inválido", "error");
+                        });
                     }
-                };
-                reader.readAsText(file);
-                input.value = "";
-            },
-
-            fetchTitlesFromTMDB: async () => {
-                const statusEl = document.getElementById('req-loading-status');
-                const itemsToFetch = Array.from(reqProcessor.parsedItems.values()).filter(i => i.title === "Buscando..." || i.title === "Erro");
-                const total = itemsToFetch.length;
+                }
+                if (links.length === 0) {
+                    content.innerHTML = '<div class="text-zinc-600 text-center py-10 text-sm">Nenhum link configurado neste ficheiro.</div>';
+                } else {
+                    const html = links.map(link => `
+                        <div class="bg-zinc-900 hover:bg-zinc-800 p-3.5 rounded-xl border border-zinc-800 flex justify-between items-center transition-colors cursor-pointer group" onclick="navigator.clipboard.writeText('${link.url}'); showToast('Link copiado!');">
+                            <div class="text-xs font-medium text-zinc-300 truncate group-hover:text-white flex-1 pr-4">${link.name}</div>
+                            <div class="text-zinc-600 group-hover:text-zinc-300"><i class="fa-regular fa-copy text-sm"></i></div>
+                        </div>
+                    `).join('');
+                    content.innerHTML = `<div class="space-y-2">${html}</div>`;
+                }
                 
-                if (total === 0) return;
-
-                let count = 0;
-                for (const item of itemsToFetch) {
-                    const pct = Math.round((count / total) * 100);
-                    statusEl.innerHTML = `<span class="loader inline-block w-3 h-3 mr-2 border-zinc-500 border-t-zinc-300"></span> TMDB: ${pct}%`;
-
+                document.getElementById('linkModal').classList.remove('hidden');
+            },
+            closeModal: () => document.getElementById('linkModal').classList.add('hidden')
+        };
+        // === GERADOR E INTEGRAÇÃO COM SERVIDOR ===
+        const gen = {
+            currentData: null,
+            currentSeriesVideos: [],
+            lastCinemetaResults: [], 
+            
+            searchCinemeta: async () => {
+                const query = document.getElementById('cinemetaSearch').value.trim();
+                if (!query) return;
+                const resultsDiv = document.getElementById('cinemetaResults');
+                resultsDiv.innerHTML = '<div class="text-center py-4"><i class="fa-solid fa-circle-notch fa-spin text-indigo-500"></i></div>';
+                try {
+                    const selectedType = document.querySelector('input[name="contentType"]:checked').value;
+                    let allResults = [];
+                    if (selectedType === 'movie') {
+                        const moviesRes = await fetch(`https://v3-cinemeta.strem.io/catalog/movie/top/search=${encodeURIComponent(query)}.json`).then(r => r.json()).catch(() => ({metas: []}));
+                        allResults = (moviesRes.metas || []).map(m => ({ ...m, type: 'movie' }));
+                    } else {
+                        const seriesRes = await fetch(`https://v3-cinemeta.strem.io/catalog/series/top/search=${encodeURIComponent(query)}.json`).then(r => r.json()).catch(() => ({metas: []}));
+                        allResults = (seriesRes.metas || []).map(m => ({ ...m, type: 'series' }));
+                    }
+                    if (allResults.length === 0) {
+                        resultsDiv.innerHTML = '<p class="text-[10px] text-red-400 text-center mt-4">Nenhum resultado.</p>';
+                        return;
+                    }
+                    gen.lastCinemetaResults = allResults;
+                    resultsDiv.innerHTML = allResults.map((item, index) => `
+                        <div class="bg-zinc-950 p-2 rounded-xl border border-zinc-800 hover:border-indigo-500 cursor-pointer flex gap-3 items-center transition" onclick="gen.selectCinemetaItem(${index})">
+                            <img src="${item.poster || 'data:image/svg+xml;utf8,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22%3E%3C/svg%3E'}" class="w-10 h-14 object-cover rounded bg-zinc-900 flex-shrink-0">
+                            <div class="flex-1 min-w-0">
+                                <p class="text-xs font-semibold text-zinc-200 truncate">${item.name}</p>
+                                <p class="text-[10px] text-zinc-500">${item.year || ''} • <span class="uppercase">${item.type === 'movie' ? 'Filme' : 'Série'}</span></p>
+                            </div>
+                        </div>
+                    `).join('');
+                } catch (err) {
+                    resultsDiv.innerHTML = '<p class="text-[10px] text-red-400 text-center mt-4">Erro na pesquisa.</p>';
+                }
+            },
+            selectCinemetaItem: async (index) => {
+                const item = gen.lastCinemetaResults[index];
+                if (!item) return;
+                document.getElementById('contentId').value = item.id;
+                document.getElementById('seriesName').value = item.name;
+                document.getElementById('fileNameOriginal').value = item.id + '.json';
+                
+                document.querySelector(`input[name="contentType"][value="${item.type}"]`).checked = true;
+                gen.toggleInputs();
+                if (item.type === 'series') {
+                    document.getElementById('seasonLimit').textContent = '(A procurar...)';
+                    document.getElementById('episodeLimit').textContent = '(A procurar...)';
+                    
                     try {
-                        const res = await fetch(`https://api.themoviedb.org/3/find/${item.id}?api_key=${reqProcessor.tmdbKey}&external_source=imdb_id&language=pt-BR`);
-                        if(res.ok) {
-                            const data = await res.json();
-                            if (item.type === 'movie' && data.movie_results.length > 0) {
-                                item.title = data.movie_results[0].title;
-                            } else if (item.type === 'series' && data.tv_results.length > 0) {
-                                item.title = data.tv_results[0].name;
-                            } else {
-                                item.title = "Título desconhecido";
-                            }
+                        const res = await fetch(`https://v3-cinemeta.strem.io/meta/series/${item.id}.json`);
+                        const data = await res.json();
+                        if (data.meta && data.meta.videos) {
+                            gen.currentSeriesVideos = data.meta.videos;
+                            gen.updateLimits();
+                        } else {
+                            gen.currentSeriesVideos = [];
+                            gen.updateLimits();
                         }
                     } catch(e) {
-                        item.title = "Erro";
+                        gen.currentSeriesVideos = [];
+                        gen.updateLimits();
                     }
-                    count++;
+                } else {
+                    gen.currentSeriesVideos = [];
+                    gen.updateLimits();
                 }
-                
-                statusEl.innerText = `100% Concluído`;
-                document.getElementById('btn-download-json').classList.remove('hidden');
-                document.getElementById('btn-download-txt').classList.remove('hidden');
-                document.getElementById('btn-download-csv')?.classList.remove('hidden');
-                reqProcessor.renderList(); 
+                showToast("Dados do Cinemeta carregados!", "success");
             },
-
-            updateUI: () => {
-                document.getElementById('req-total-lines').innerText = reqProcessor.totalLinesRead;
-                
-                let movies = 0; let series = 0; let totalRequests = 0;
-                reqProcessor.parsedItems.forEach(item => {
-                    if(item.type === 'movie') movies++;
-                    if(item.type === 'series') series++;
-                    totalRequests += (item.count || 1);
-                });
-
-                document.getElementById('req-movies-count').innerText = movies;
-                document.getElementById('req-series-count').innerText = series;
-                const totalEl = document.getElementById('req-total-requests');
-                if(totalEl) totalEl.innerText = totalRequests.toLocaleString('pt-BR');
-
-                if(reqProcessor.parsedItems.size > 0) {
-                    const searchRow = document.getElementById('req-search-row');
-                    if(searchRow) searchRow.classList.remove('hidden');
+            updateLimits: () => {
+                const type = document.querySelector('input[name="contentType"]:checked').value;
+                if (type !== 'series' || !gen.currentSeriesVideos || gen.currentSeriesVideos.length === 0) {
+                    document.getElementById('seasonLimit').textContent = '';
+                    document.getElementById('episodeLimit').textContent = '';
+                    return;
                 }
+                const seasons = gen.currentSeriesVideos.map(v => v.season).filter(s => s > 0);
+                const maxSeason = seasons.length > 0 ? Math.max(...seasons) : '?';
+                document.getElementById('seasonLimit').textContent = `(Máx: ${maxSeason})`;
+                const currentSeason = parseInt(document.getElementById('seasonNum').value) || 1;
+                const episodes = gen.currentSeriesVideos.filter(v => v.season === currentSeason).map(v => v.episode);
+                const maxEpisode = episodes.length > 0 ? Math.max(...episodes) : '?';
+                document.getElementById('episodeLimit').textContent = `(Máx: ${maxEpisode})`;
             },
-
-            renderList: () => {
-                const container = document.getElementById('req-results-container');
-                if (reqProcessor.parsedItems.size === 0) return;
-
-                const busca = (document.getElementById('req-search')?.value || '').toLowerCase();
-                const sortMode = document.getElementById('req-sort')?.value || 'count';
-                const filterType = document.getElementById('req-filter-type')?.value || 'all';
-
-                let items = Array.from(reqProcessor.parsedItems.values())
-                    .filter(item => filterType === 'all' || item.type === filterType)
-                    .filter(item => !busca || item.id.toLowerCase().includes(busca) || (item.title||'').toLowerCase().includes(busca));
-
-                if (sortMode === 'count') items.sort((a,b) => (b.count||0) - (a.count||0));
-                else if (sortMode === 'alpha') items.sort((a,b) => (a.title||a.id).localeCompare(b.title||b.id));
-                else if (sortMode === 'type') items.sort((a,b) => a.type.localeCompare(b.type) || (b.count||0) - (a.count||0));
-
-                let html = '';
-                items.forEach(item => {
-                    const typeName = item.type === 'movie' ? 'Filme' : 'Série';
-                    const countBadge = (item.count > 1) ? `<span class="text-zinc-500 text-[10px] font-medium ml-2">${item.count} pedidos</span>` : '';
-
-                    let epsHtml = '';
-                    if (item.type === 'series' && item.missingEps.size > 0) {
-                        const epsArray = Array.from(item.missingEps).sort((a, b) => {
-                            const pa = a.match(/(\d+)/g)?.map(Number) || [0,0];
-                            const pb = b.match(/(\d+)/g)?.map(Number) || [0,0];
-                            return pa[0] !== pb[0] ? pa[0] - pb[0] : (pa[1]||0) - (pb[1]||0);
+            toggleInputs: () => {
+                const type = document.querySelector('input[name="contentType"]:checked').value;
+                document.getElementById('seasonContainer').style.display = type === 'series' ? 'block' : 'none';
+                gen.updateLimits();
+            },
+            reset: () => {
+                if(!confirm('Limpar todos os campos não guardados?')) return;
+                gen.currentData = null;
+                document.getElementById('contentId').value = '';
+                document.getElementById('seriesName').value = '';
+                document.getElementById('fileNameOriginal').value = '';
+                document.getElementById('manualLinks').value = '';
+                document.getElementById('jsonOutput').value = '';
+            },
+            cleanUrl: (line) => {
+                const match = line.match(/(https?:\/\/[^\s]+)/);
+                return match ? match[1].trim() : null;
+            },
+            process: () => {
+                const id = document.getElementById('contentId').value.trim();
+                if (!id) return showToast("ID (IMDb) é obrigatório!", "error");
+                const type = document.querySelector('input[name="contentType"]:checked').value;
+                const audioLang = document.getElementById('audioLanguage').value || "Dublado";
+                const vidQuality = document.getElementById('videoQuality').value || "1080p";
+                const audioLabel = `${audioLang}\n${vidQuality}\nFenixflix`;
+                const rawText = document.getElementById('manualLinks').value;
+                
+                if (!rawText.trim() && !gen.currentData) return showToast("Cole os links primeiro.", "error");
+                if (!gen.currentData) gen.currentData = { id: id, type: type, streams: type === 'series' ? {} : [] };
+                else { gen.currentData.id = id; gen.currentData.type = type; }
+                if (rawText.trim()) {
+                    const lines = rawText.split('\n').map(l => l.trim()).filter(l => l);
+                    let addedCount = 0;
+                    if (type === 'series') {
+                        let manualSeason = document.getElementById('seasonNum').value || '1';
+                        let manualEp = parseInt(document.getElementById('startEp').value) || 1;
+                        lines.forEach(line => {
+                            const url = gen.cleanUrl(line);
+                            if (url) {
+                                if (!gen.currentData.streams[manualSeason]) gen.currentData.streams[manualSeason] = {};
+                                if (!gen.currentData.streams[manualSeason][manualEp.toString()]) gen.currentData.streams[manualSeason][manualEp.toString()] = [];
+                                
+                                gen.currentData.streams[manualSeason][manualEp.toString()].push({ url: url, name: audioLabel });
+                                addedCount++;
+                                manualEp++;
+                            }
                         });
-                        const epTags = epsArray.map(ep => `<span class="bg-zinc-900 border border-zinc-800 text-zinc-400 rounded-md px-2 py-1 text-[10px] font-mono">${ep}</span>`).join('');
-                        epsHtml = `<div class="mt-3 flex flex-wrap gap-1.5">${epTags}</div>`;
+                        document.getElementById('startEp').value = manualEp;
+                    } else {
+                        if(!Array.isArray(gen.currentData.streams)) gen.currentData.streams = [];
+                        lines.forEach(line => {
+                            const url = gen.cleanUrl(line);
+                            if(url) {
+                                gen.currentData.streams.push({ url: url, name: audioLabel });
+                                addedCount++;
+                            }
+                        });
                     }
-
-                    html += `
-                        <div class="bg-zinc-950 p-4 rounded-xl border border-zinc-900 flex flex-col group">
-                            <div class="flex items-center justify-between">
-                                <div class="overflow-hidden">
-                                    <div class="flex items-center gap-2">
-                                        <h4 class="font-medium text-white text-sm truncate">${item.title}</h4>
-                                        <span class="text-[9px] text-zinc-500 uppercase tracking-widest border border-zinc-800 px-1.5 rounded">${typeName}</span>
-                                    </div>
-                                    <div class="flex items-center mt-1">
-                                        <span class="font-mono text-[10px] text-zinc-600">${item.id}</span>
-                                        ${countBadge}
-                                    </div>
-                                </div>
-                                <button onclick="reqProcessor.removeItem('${item.id}')" class="text-zinc-700 hover:text-red-400 transition p-2"><i class="fa-solid fa-xmark"></i></button>
-                            </div>
-                            ${epsHtml}
-                        </div>
-                    `;
-                });
-
-                container.innerHTML = html || '<div class="text-center py-8 text-zinc-600 text-sm">Nenhum resultado.</div>';
-            },
-
-            removeItem: (id) => {
-                if(reqProcessor.parsedItems.has(id)) {
-                    reqProcessor.parsedItems.delete(id);
-                    reqProcessor.updateUI();
-                    reqProcessor.renderList();
-                    if(reqProcessor.parsedItems.size === 0) reqProcessor.clearData();
+                    showToast(`${addedCount} links processados localmente!`);
                 }
+                
+                document.getElementById('manualLinks').value = '';
+                gen.updateDisplay();
             },
-
-            downloadTxt: () => {
-                if (reqProcessor.parsedItems.size === 0) return;
-                let txtContent = "=== RELATÓRIO DE PEDIDOS/AUSENTES ===\n\n";
-                const movies = []; const series = [];
-                reqProcessor.parsedItems.forEach(item => {
-                    if(item.type === 'movie') movies.push(item);
-                    else series.push(item);
-                });
-
-                if (movies.length > 0) {
-                    txtContent += "🎬 FILMES\n";
-                    movies.forEach((m, idx) => { txtContent += `${m.id} - ${m.title}\n`; });
-                    txtContent += "\n";
-                }
-
-                if (series.length > 0) {
-                    txtContent += "📺 SÉRIES\n";
-                    series.forEach((s, idx) => {
-                        txtContent += `${s.id} - ${s.title}\n`;
-                        if (s.missingEps.size > 0) {
-                            Array.from(s.missingEps).forEach(ep => { txtContent += `   -> ${ep}\n`; });
-                        }
+            updateDisplay: () => {
+                document.getElementById('jsonOutput').value = JSON.stringify(gen.currentData, null, 4);
+            },
+            syncManualEdit: () => {
+                try {
+                    gen.currentData = JSON.parse(document.getElementById('jsonOutput').value);
+                } catch (e) { /* Ignora até ser json válido */ }
+            },
+            saveToServer: async () => {
+                gen.syncManualEdit();
+                if (!gen.currentData) return showToast("Nenhum dado processado para guardar", "error");
+                const sugerido = document.getElementById('fileNameOriginal').value || 
+                                 document.getElementById('seriesName').value.trim() || 
+                                 gen.currentData.id || 
+                                 "novo_ficheiro";
+                                 
+                let fileName = prompt("Qual o nome do ficheiro para guardar no servidor?\n(Ex: tt0903747.json ou breaking_bad.json)", sugerido.includes('.json') ? sugerido : sugerido + '.json');
+                
+                if (!fileName) return; // Cancelou
+                if (!fileName.endsWith('.json')) fileName += '.json';
+                try {
+                    const res = await fetch('/api/save', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ fileName: fileName, content: gen.currentData })
                     });
+                    
+                    if (res.ok) {
+                        showToast(`Ficheiro ${fileName} guardado no servidor!`, "success");
+                        document.getElementById('fileNameOriginal').value = fileName;
+                        cat.init(); 
+                    } else {
+                        showToast("Erro ao gravar ficheiro", "error");
+                    }
+                } catch(e) {
+                    showToast("Erro de rede ao conectar com backend", "error");
                 }
-
-                const blob = new Blob([txtContent], { type: 'text/plain;charset=utf-8' });
-                const a = document.createElement('a');
-                a.href = URL.createObjectURL(blob);
-                const data = new Date();
-                a.download = `ausentes_${data.getDate()}-${data.getMonth()+1}.txt`;
-                document.body.appendChild(a); a.click(); document.body.removeChild(a);
             },
-
-            downloadCsv: () => {
-                if (reqProcessor.parsedItems.size === 0) return;
-                const items = Array.from(reqProcessor.parsedItems.values()).sort((a,b) => (b.count||0) - (a.count||0));
-                const linhas = [['ID','Tipo','Título','Pedidos','Episódios Faltantes']];
-                items.forEach(item => {
-                    const eps = Array.from(item.missingEps).sort().join(' | ');
-                    linhas.push([item.id, item.type === 'movie' ? 'Filme' : 'Série', item.title, item.count || 1, eps]);
-                });
-                const csv = linhas.map(l => l.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('');
-                const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
-                const a = document.createElement('a');
-                a.href = URL.createObjectURL(blob);
-                const d = new Date(); a.download = `ausentes_${d.getDate()}-${d.getMonth()+1}.csv`;
-                document.body.appendChild(a); a.click(); document.body.removeChild(a);
-            },
-
-            downloadJson: () => {
-                if (reqProcessor.parsedItems.size === 0) return;
-                const jsonContent = JSON.stringify({
-                    totalLidos: reqProcessor.totalLinesRead,
-                    items: Array.from(reqProcessor.parsedItems.values()).map(i => ({...i, missingEps: Array.from(i.missingEps)}))
-                }, null, 4);
-                const blob = new Blob([jsonContent], { type: 'application/json' });
-                const a = document.createElement('a');
-                a.href = URL.createObjectURL(blob);
-                const data = new Date();
-                a.download = `progresso_ausentes_${data.getDate()}-${data.getMonth()+1}.json`;
-                document.body.appendChild(a); a.click(); document.body.removeChild(a);
+            
+            uploadBulk: async (event) => {
+                const fileInput = document.getElementById('bulkJsonUpload');
+                const files = fileInput.files;
+                if (files.length === 0) return showToast("Selecione os ficheiros JSON primeiro!", "error");
+                const formData = new FormData();
+                for (let i = 0; i < files.length; i++) {
+                    formData.append('jsons', files[i]);
+                }
+                try {
+                    const btn = event.currentTarget;
+                    const originalHtml = btn.innerHTML;
+                    btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> A enviar...';
+                    btn.disabled = true;
+                    const res = await fetch('/api/upload-bulk', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    if (res.ok) {
+                        showToast(`${files.length} ficheiros enviados com sucesso!`, "success");
+                        fileInput.value = ''; // Limpa o campo
+                        cat.init(); // Recarrega o catálogo automaticamente
+                    } else {
+                        showToast("Erro ao enviar ficheiros", "error");
+                    }
+                    btn.innerHTML = originalHtml;
+                    btn.disabled = false;
+                } catch(e) {
+                    showToast("Erro de rede ao conectar com backend", "error");
+                }
             }
         };
-
+        // === SISTEMA DE PEDIDOS ===
+        const pedidos = {
+            tipoDetectado: null,
+            debounceTimer: null,
+            init: () => {
+                document.getElementById('pedidoTitulo').addEventListener('input', (e) => {
+                    clearTimeout(pedidos.debounceTimer);
+                    const val = e.target.value.trim();
+                    if (val.length < 3) {
+                        document.getElementById('pedidoTipoDetectado').classList.add('hidden');
+                        pedidos.tipoDetectado = null;
+                        return;
+                    }
+                    pedidos.debounceTimer = setTimeout(() => pedidos.identificarTipo(val), 700);
+                });
+                pedidos.carregar();
+            },
+            identificarTipo: async (titulo) => {
+                const box = document.getElementById('pedidoTipoDetectado');
+                const icon = document.getElementById('pedidoTipoIcon');
+                const texto = document.getElementById('pedidoTipoTexto');
+                box.classList.remove('hidden');
+                icon.className = 'fa-solid fa-circle-notch fa-spin text-indigo-400';
+                texto.textContent = 'A identificar tipo...';
+                pedidos.tipoDetectado = null;
+                try {
+                    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            model: 'claude-sonnet-4-20250514',
+                            max_tokens: 1000,
+                            messages: [{
+                                role: 'user',
+                                content: `O título abaixo é um filme ou uma série/anime? Responda APENAS com JSON puro sem markdown, no formato: {"tipo":"filme","nome_original":"..."} ou {"tipo":"serie","nome_original":"..."}\n\nTítulo: ${titulo}`
+                            }]
+                        })
+                    });
+                    const data = await resp.json();
+                    const text = data.content?.[0]?.text || '';
+                    const parsed = JSON.parse(text.replace(/```json|```/g, '').trim());
+                    pedidos.tipoDetectado = parsed.tipo;
+                    const nomeOriginal = parsed.nome_original || titulo;
+                    icon.className = pedidos.tipoDetectado === 'filme'
+                        ? 'fa-solid fa-film text-emerald-400'
+                        : 'fa-solid fa-tv text-indigo-400';
+                    texto.textContent = `Identificado como: ${pedidos.tipoDetectado.toUpperCase()} — "${nomeOriginal}"`;
+                } catch(e) {
+                    icon.className = 'fa-solid fa-question text-zinc-500';
+                    texto.textContent = 'Não foi possível identificar automaticamente.';
+                    pedidos.tipoDetectado = 'desconhecido';
+                }
+            },
+            enviar: async () => {
+                const nome = document.getElementById('pedidoNome').value.trim();
+                const titulo = document.getElementById('pedidoTitulo').value.trim();
+                if (!nome) return showToast('Coloque o seu nome!', 'error');
+                if (!titulo) return showToast('Informe o título!', 'error');
+                const btn = document.getElementById('btnEnviarPedido');
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> A enviar...';
+                try {
+                    const res = await fetch('/api/pedidos', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ nome, titulo, tipo: pedidos.tipoDetectado || 'desconhecido' })
+                    });
+                    if (res.ok) {
+                        showToast('Pedido enviado com sucesso!', 'success');
+                        document.getElementById('pedidoNome').value = '';
+                        document.getElementById('pedidoTitulo').value = '';
+                        document.getElementById('pedidoTipoDetectado').classList.add('hidden');
+                        pedidos.tipoDetectado = null;
+                        pedidos.carregar();
+                    } else {
+                        showToast('Erro ao enviar pedido', 'error');
+                    }
+                } catch(e) {
+                    showToast('Erro de rede', 'error');
+                } finally {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Enviar Pedido';
+                }
+            },
+            filtroAtual: 'all',
+            carregar: async (tipo = 'all') => {
+                pedidos.filtroAtual = tipo;
+                
+                document.querySelectorAll('.pf-btn').forEach(b => {
+                    b.className = 'pf-btn bg-zinc-800 text-zinc-400 border border-zinc-700 hover:text-white px-4 py-1.5 rounded-lg text-xs font-medium transition-colors';
+                });
+                const activeBtn = document.getElementById(`pfbtn-${tipo}`);
+                if (activeBtn) activeBtn.className = 'pf-btn bg-white text-zinc-900 px-4 py-1.5 rounded-lg text-xs font-medium transition-colors';
+                const list = document.getElementById('pedidosList');
+                list.innerHTML = '<p class="text-zinc-600 text-xs text-center py-6"><i class="fa-solid fa-circle-notch fa-spin mr-2"></i>A carregar...</p>';
+                try {
+                    const url = tipo && tipo !== 'all' ? `/api/pedidos?tipo=${tipo}` : '/api/pedidos';
+                    const res = await fetch(url);
+                    const data = await res.json();
+                    if (!data || data.length === 0) {
+                        list.innerHTML = '<p class="text-zinc-600 text-xs text-center py-6">Nenhum pedido ainda. Seja o primeiro!</p>';
+                        return;
+                    }
+                    // Ordena por mais pedidos
+                    data.sort((a, b) => (b.pedidos || 1) - (a.pedidos || 1));
+                    list.innerHTML = data.map((p, i) => {
+                        const tipoIcon = p.tipo === 'filme' ? 'fa-film text-emerald-400' : p.tipo === 'serie' ? 'fa-tv text-indigo-400' : 'fa-question text-zinc-500';
+                        const tipoLabel = p.tipo === 'filme' ? 'Filme' : p.tipo === 'serie' ? 'Série/Anime' : 'Desconhecido';
+                        const solicitantes = Array.isArray(p.solicitantes) ? p.solicitantes.join(', ') : '';
+                        const medalha = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i+1}`;
+                        return `
+                        <div class="bg-zinc-950 rounded-xl border border-zinc-800 p-4 flex items-center gap-4">
+                            <span class="text-lg font-bold text-zinc-500 w-8 text-center flex-shrink-0">${medalha}</span>
+                            <div class="flex-1 min-w-0">
+                                <div class="flex items-center gap-2 mb-1">
+                                    <i class="fa-solid ${tipoIcon} text-xs"></i>
+                                    <span class="text-xs font-semibold text-white truncate">${p.titulo}</span>
+                                    <span class="text-[10px] text-zinc-600 uppercase tracking-wider flex-shrink-0">${tipoLabel}</span>
+                                </div>
+                                <p class="text-[10px] text-zinc-600 truncate">Pedido por: ${solicitantes}</p>
+                            </div>
+                            <div class="flex-shrink-0 text-center">
+                                <span class="text-xl font-bold ${p.pedidos >= 3 ? 'text-amber-400' : 'text-zinc-400'}">${p.pedidos || 1}</span>
+                                <p class="text-[10px] text-zinc-600">pedido${(p.pedidos||1) > 1 ? 's' : ''}</p>
+                            </div>
+                        </div>`;
+                    }).join('');
+                } catch(e) {
+                    list.innerHTML = '<p class="text-red-400 text-xs text-center py-6">Erro ao carregar pedidos. O servidor Go está a correr?</p>';
+                }
+            }
+        };
+        pedidos.init();
+        // Inicia o catálogo na inicialização da página
+        cat.init();
     </script>
 </body>
 </html>
