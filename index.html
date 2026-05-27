@@ -848,6 +848,12 @@
                 const senha = localStorage.getItem('fenixflix_senha');
                 if (!senha) return showToast("Precisa ativar o Modo Admin e colocar a senha primeiro!", "error");
             
+                // ======= CORREÇÃO AQUI =======
+                // Injeta o nome do ficheiro DIRETAMENTE DENTRO DO JSON antes de enviar para o servidor.
+                // Assim o Frontend nunca vai perder a referência de qual é o nome verdadeiro do ficheiro na Base de Dados.
+                gen.currentData.fileName = fileName;
+                // ==============================
+
                 // Formata os dados para o Go ler via r.FormValue()
                 const formData = new URLSearchParams();
                 formData.append('senha', senha);
@@ -892,8 +898,19 @@
                 // Lê os ficheiros e envia um por um para o novo backend
                 for (let i = 0; i < files.length; i++) {
                     const file = files[i];
-                    const text = await file.text();
+                    let text = await file.text();
                     
+                    // ======= CORREÇÃO AQUI =======
+                    // Injeta o nome do ficheiro para os envios em massa também
+                    try {
+                        let parsedData = JSON.parse(text);
+                        parsedData.fileName = file.name;
+                        text = JSON.stringify(parsedData);
+                    } catch(e) {
+                        // Ignora se não for JSON válido e deixa o backend rejeitar
+                    }
+                    // ==============================
+
                     const formData = new URLSearchParams();
                     formData.append('senha', senha);
                     formData.append('nome', file.name);
