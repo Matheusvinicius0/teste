@@ -4,521 +4,483 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
 	"os"
-	"path/filepath"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/joho/godotenv"
-	_ "github.com/lib/pq" // Driver do PostgreSQL
+	_ "github.com/lib/pq"
 )
 
-// Estruturas de dados esperadas do frontend
-type SaveRequest struct {
-	FileName string      `json:"fileName"`
-	Content  interface{} `json:"content"`
+// ==== CONSTANTES TMDB E RPDB ====
+const (
+	RPDBBaseURL = "https://api.ratingposterdb.com/t0-free-rpdb"
+	// Token Bearer do TMDB
+	TMDBAPIKey  = "eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJlZTBmMzJmNzY5Mzc0YTkzYTI0ZmNiYzcyMWRlODYzNCIsIm5iZiI6MTc1NjA2MzM2NC4yMzksInN1YiI6IjY4YWI2Njg0ZDAyMjdhYTVlMjlkYjE2MSIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.z1hG61Z5RCvn6qEZj60sHxrDZ0hR8QQi4rt18erzF-w"
+)
+
+var (
+	db            *sql.DB
+	tmdbCache     sync.Map
+	cinemetaCache sync.Map // Cache para não sobrecarregar o Cinemeta
+	httpClient    = &http.Client{Timeout: 10 * time.Second}
+)
+
+// ==== ESTRUTURAS DO TMDB ====
+type TMDBFindResponse struct {
+	MovieResults []struct {
+		Title       string `json:"title"`
+		ReleaseDate string `json:"release_date"`
+	} `json:"movie_results"`
+	TvResults []struct {
+		Name         string `json:"name"`
+		FirstAirDate string `json:"first_air_date"`
+	} `json:"tv_results"`
 }
 
-type DeleteRequest struct {
-	FileName string `json:"fileName"`
+type TMDBData struct {
+	Title string
+	Year  string
+	Type  string
 }
 
-const dataDir = "./data"
-
-// Variável global para a Base de Dados (caso precises de a usar noutras funções no futuro)
-var DB *sql.DB
-
-func main() {
-	// 0. Carregar as variáveis do ficheiro .env
-	err := godotenv.Load()
+// ==== FUNÇÃO DE BUSCA NO TMDB ====
+func getTMDBInfo(id string, client *http.Client) TMDBData {
+	if cached, ok := tmdbCache.Load(id); ok {
+		return cached.(TMDBData)
+	}
+	
+	url := fmt.Sprintf("https://api.themoviedb.org/3/find/%s?external_source=imdb_id&language=pt-PT", id)
+	
+	req, _ := http.NewRequest("GET", url, nil)
+	req.Header.Set("User-Agent", "Mozilla/5.0")
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Authorization", "Bearer "+TMDBAPIKey)
+	
+	resp, err := client.Do(req)
 	if err != nil {
-		log.Println("⚠️  Aviso: Ficheiro .env não encontrado. A tentar usar as variáveis do sistema.")
+		log.Printf("❌ Erro de rede ao contactar TMDB para o ID %s: %v", id, err)
+		return TMDBData{}
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		log.Printf("⚠️ TMDB recusou o pedido para o ID %s. Código de erro: %d (Verifique se a chave TMDB está correta)", id, resp.StatusCode)
+		return TMDBData{}
 	}
 
-	// 0.1 Iniciar Ligação à Base de Dados PostgreSQL
-	dbURL := os.Getenv("DATABASE_URL")
-	if dbURL != "" {
-		DB, err = sql.Open("postgres", dbURL)
-		if err != nil {
-			log.Fatalf("❌ Erro ao abrir a ligação à base de dados: %v\n", err)
+	var tmdb TMDBFindResponse
+	data := TMDBData{Type: "movie"}
+	if err := json.NewDecoder(resp.Body).Decode(&tmdb); err == nil {
+		if len(tmdb.MovieResults) > 0 {
+			data.Title = tmdb.MovieResults[0].Title
+			data.Type = "movie"
+			if len(tmdb.MovieResults[0].ReleaseDate) >= 4 {
+				data.Year = tmdb.MovieResults[0].ReleaseDate[:4]
+			}
+			log.Printf("✅ TMDB encontrou Filme: %s", data.Title)
+		} else if len(tmdb.TvResults) > 0 {
+			data.Title = tmdb.TvResults[0].Name
+			data.Type = "series"
+			if len(tmdb.TvResults[0].FirstAirDate) >= 4 {
+				data.Year = tmdb.TvResults[0].FirstAirDate[:4]
+			}
+			log.Printf("✅ TMDB encontrou Série: %s", data.Title)
+		} else {
+			log.Printf("⚠️ TMDB respondeu com sucesso, mas não encontrou o ID %s", id)
 		}
-		// Testa se a ligação está realmente a funcionar
-		err = DB.Ping()
-		if err != nil {
-			log.Fatalf("❌ Erro ao comunicar com a base de dados: %v\n", err)
-		}
-		fmt.Println("✅ Ligação ao PostgreSQL estabelecida com sucesso!")
 	} else {
-		fmt.Println("⚠️  Nenhum DATABASE_URL encontrado. O servidor vai arrancar sem BD.")
+		log.Printf("❌ Erro ao ler resposta do TMDB para o ID %s: %v", id, err)
 	}
 
-	// Cria a pasta "data" automaticamente para guardar os arquivos JSON locais
-	if err := os.MkdirAll(dataDir, 0755); err != nil {
-		fmt.Println("Erro ao criar diretório de dados:", err)
+	if data.Title != "" {
+		tmdbCache.Store(id, data)
+	}
+	return data
+}
+
+// ==== FUNÇÃO DE BUSCA NO CINEMETA (STREMIO) ====
+func getCinemetaInfo(id string, cType string, client *http.Client) map[string]interface{} {
+	cacheKey := id + "_" + cType
+	if cached, ok := cinemetaCache.Load(cacheKey); ok {
+		return cached.(map[string]interface{})
+	}
+
+	url := fmt.Sprintf("https://v3-cinemeta.strem.io/meta/%s/%s.json", cType, id)
+	req, _ := http.NewRequest("GET", url, nil)
+	req.Header.Set("User-Agent", "Mozilla/5.0")
+	
+	resp, err := client.Do(req)
+	if err != nil || resp.StatusCode != 200 {
+		return nil
+	}
+	defer resp.Body.Close()
+
+	var result struct {
+		Meta map[string]interface{} `json:"meta"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err == nil && result.Meta != nil {
+		cinemetaCache.Store(cacheKey, result.Meta)
+		return result.Meta
+	}
+	return nil
+}
+
+// ==== INICIALIZAÇÃO DA BASE DE DADOS ====
+func initDB() {
+	connStr := os.Getenv("DATABASE_URL")
+	if connStr == "" {
+		log.Println("⚠️ AVISO CRÍTICO: DATABASE_URL não está configurada! A API não conseguirá gravar nem ler da base de dados.")
 		return
 	}
 
+	var err error
+	db, err = sql.Open("postgres", connStr)
+	if err != nil {
+		log.Fatalf("❌ Erro ao abrir conexão: %v", err)
+	}
+
+	err = db.Ping()
+	if err != nil {
+		log.Fatalf("❌ Falha na comunicação com o PostgreSQL: %v", err)
+	}
+
+	query := `
+		CREATE TABLE IF NOT EXISTS arquivos_json (
+			id SERIAL PRIMARY KEY,
+			nome VARCHAR(255) UNIQUE NOT NULL,
+			conteudo JSONB NOT NULL,
+			data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+		)
+	`
+	_, err = db.Exec(query)
+	if err != nil {
+		log.Fatalf("❌ Erro ao criar tabela: %v", err)
+	}
+	fmt.Println("✅ Base de dados PostgreSQL ligada e tabela verificada.")
+}
+
+func main() {
+	// Carrega o ficheiro .env se existir (útil para desenvolvimento local)
+	_ = godotenv.Load()
+
+	initDB()
+
 	mux := http.NewServeMux()
 
-	// 1. Servir o index.html na raiz do site
-	mux.HandleFunc("/", serveIndex)
+	mux.HandleFunc("/upload", uploadHandler)
+	mux.HandleFunc("/api/all", listAllHandler)
+	mux.HandleFunc("/api/catalog", listAllHandler)
+	mux.HandleFunc("/api/delete", deleteHandler) 
+	mux.HandleFunc("/count", countHandler)
+	mux.HandleFunc("/ping", pingHandler)
+	
+	mux.HandleFunc("/", rootHandler)
 
-	// 2. API que lê a pasta e envia todos os JSONs para o frontend
-	mux.HandleFunc("/api/catalog", handleCatalog)
-
-	// --- ROTAS PROTEGIDAS PELA SENHA DO ADMIN ---
-	// Usamos a função "adminAuth" para bloquear quem não tem a senha
-	// 3. API para Salvar / Editar um JSON
-	mux.HandleFunc("/api/save", adminAuth(handleSave))
-
-	// 4. API para Apagar um JSON
-	mux.HandleFunc("/api/delete", adminAuth(handleDelete))
-
-	// 8. Rota para receber uploads múltiplos de JSONs
-	mux.HandleFunc("/api/upload-bulk", adminAuth(handleBulkUpload))
-	// ----------------------------------------------
-
-	// 5. Proxy Seguro para o TMDB (Puxa a chave do .env escondida do utilizador)
-	mux.HandleFunc("/api/tmdb", handleTMDBProxy)
-
-	// 6. API de Pedidos dos utilizadores
-	mux.HandleFunc("/api/pedidos", handlePedidos)
-
-	// 7. Servir os ficheiros JSON diretamente para visualização/leitura
-	mux.Handle("/json/", http.StripPrefix("/json/", http.FileServer(http.Dir(dataDir))))
-
-	// 9. Rota para fazer pedidos diretamente pelo URL
-	mux.HandleFunc("/pedido/", handlePedidoPorURL)
+	handler := corsMiddleware(mux)
 
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
 	}
 
-	fmt.Println("=========================================")
-	fmt.Printf("🚀 Servidor FenixFlix a correr!\n")
-	fmt.Printf("🌐 Aceda no navegador: http://localhost:%s\n", port)
-	fmt.Printf("📂 Os JSONs serão guardados na pasta: %s\n", dataDir)
-	if os.Getenv("ADMIN_PASSWORD") != "" {
-		fmt.Println("🔒 Sistema de Segurança (Admin) ATIVADO!")
-	} else {
-		fmt.Println("⚠️  ATENÇÃO: ADMIN_PASSWORD não configurada, rotas desprotegidas!")
-	}
-	fmt.Println("=========================================")
-
-	http.ListenAndServe(":"+port, mux)
+	fmt.Printf("🚀 FenixFlix (Go) a rodar na porta %s\n", port)
+	log.Fatal(http.ListenAndServe(":"+port, handler))
 }
 
-// === MIDDLEWARE DE AUTENTICAÇÃO ===
-// Esta função verifica se a senha fornecida pelo frontend corresponde à do .env
-func adminAuth(next http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		expectedPass := os.Getenv("ADMIN_PASSWORD")
+// 1. Rota de Upload (Protegida)
+func uploadHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	
+	if db == nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(`{"erro": "Servidor sem ligação à base de dados."}`))
+		return
+	}
+
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		w.Write([]byte(`{"erro": "Método não permitido"}`))
+		return
+	}
+
+	senha := r.FormValue("senha")
+	nome := r.FormValue("nome")
+	conteudo := r.FormValue("conteudo")
+
+	adminPassword := os.Getenv("ADMIN_PASSWORD")
+	if adminPassword == "" {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(`{"erro": "Erro de Segurança: ADMIN_PASSWORD não configurada no servidor!"}`))
+		return
+	}
+
+	if senha != adminPassword {
+		w.WriteHeader(http.StatusForbidden)
+		w.Write([]byte(`{"erro": "Acesso negado: Palavra-passe incorreta"}`))
+		return
+	}
+
+	if nome == "" || conteudo == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte(`{"erro": "Nome e conteúdo são obrigatórios"}`))
+		return
+	}
+
+	if !json.Valid([]byte(conteudo)) {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte(`{"erro": "O conteúdo enviado não é um JSON válido"}`))
+		return
+	}
+
+	// =========================================================================
+	// MAGIA TMDB/CINEMETA/RPDB: Agora lê o ID por dentro do JSON!
+	// =========================================================================
+	var data map[string]interface{}
+	if err := json.Unmarshal([]byte(conteudo), &data); err == nil {
 		
-		// Se não houver senha no .env, deixamos passar (útil para desenvolvimento local)
-		if expectedPass == "" {
-			next(w, r)
-			return
+		imdbID := ""
+		
+		// 1. Procura o ID dentro do próprio JSON (Onde o editor sempre coloca o 'tt')
+		if idVal, ok := data["id"].(string); ok && strings.HasPrefix(idVal, "tt") {
+			imdbID = idVal
+		} else if strings.HasPrefix(nome, "tt") {
+			// Fallback: tenta ver pelo nome do ficheiro
+			imdbID = nome
 		}
 
-		// Tenta procurar a senha no Header "X-Admin-Password" ou como parâmetro no URL "?password=..."
-		providedPass := r.Header.Get("X-Admin-Password")
-		if providedPass == "" {
-			providedPass = r.URL.Query().Get("password")
-		}
-
-		if providedPass != expectedPass {
-			http.Error(w, `{"status":"error","message":"Acesso Negado: Senha Incorreta."}`, http.StatusUnauthorized)
-			return
-		}
-
-		// Se a senha estiver correta, segue para a função original (save, delete, etc)
-		next(w, r)
-	}
-}
-
-func serveIndex(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path != "/" {
-		http.NotFound(w, r)
-		return
-	}
-	http.ServeFile(w, r, "index.html")
-}
-
-// Lê a pasta "data" e junta todos os filmes para exibir
-func handleCatalog(w http.ResponseWriter, r *http.Request) {
-	files, err := os.ReadDir(dataDir)
-	if err != nil {
-		http.Error(w, "Erro ao ler diretório", http.StatusInternalServerError)
-		return
-	}
-
-	var catalog []interface{}
-
-	for _, file := range files {
-		if !file.IsDir() && strings.HasSuffix(file.Name(), ".json") && !strings.HasPrefix(file.Name(), "_") {
-			filePath := filepath.Join(dataDir, file.Name())
-			bytes, err := os.ReadFile(filePath)
-			if err != nil {
-				continue
-			}
-
-			var data map[string]interface{}
-			if err := json.Unmarshal(bytes, &data); err == nil {
-				data["fileName"] = file.Name()
-				catalog = append(catalog, data)
-			}
-		}
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(catalog)
-}
-
-// Grava um novo ficheiro na pasta "data"
-func handleSave(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Método não permitido", http.StatusMethodNotAllowed)
-		return
-	}
-
-	var req SaveRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Erro ao processar dados", http.StatusBadRequest)
-		return
-	}
-
-	fileName := filepath.Base(req.FileName)
-	if !strings.HasSuffix(fileName, ".json") {
-		fileName += ".json"
-	}
-	filePath := filepath.Join(dataDir, fileName)
-
-	bytes, err := json.MarshalIndent(req.Content, "", "    ")
-	if err != nil {
-		http.Error(w, "Erro ao gerar JSON", http.StatusInternalServerError)
-		return
-	}
-
-	if err := os.WriteFile(filePath, bytes, 0644); err != nil {
-		http.Error(w, "Erro ao guardar ficheiro", http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.Write([]byte(`{"status":"success","message":"Guardado com sucesso!"}`))
-}
-
-// Apaga um ficheiro da pasta "data"
-func handleDelete(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Método não permitido", http.StatusMethodNotAllowed)
-		return
-	}
-
-	var req DeleteRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Erro ao processar dados", http.StatusBadRequest)
-		return
-	}
-
-	fileName := filepath.Base(req.FileName)
-	filePath := filepath.Join(dataDir, fileName)
-
-	if err := os.Remove(filePath); err != nil {
-		http.Error(w, "Erro ao apagar ficheiro", http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.Write([]byte(`{"status":"success","message":"Ficheiro apagado!"}`))
-}
-
-// Proxy Seguro para o TMDB
-func handleTMDBProxy(w http.ResponseWriter, r *http.Request) {
-	rawID := r.URL.Query().Get("id")
-	tmdbType := r.URL.Query().Get("type") // "movie" ou "tv"
-
-	if rawID == "" || tmdbType == "" {
-		http.Error(w, "Parâmetros id e type são obrigatórios", http.StatusBadRequest)
-		return
-	}
-
-	apiKey := os.Getenv("TMDB_API_KEY")
-	if apiKey == "" {
-		http.Error(w, "Chave da API do TMDB não configurada", http.StatusInternalServerError)
-		return
-	}
-
-	tmdbID := rawID
-	if strings.HasPrefix(rawID, "tt") {
-		findURL := fmt.Sprintf("https://api.themoviedb.org/3/find/%s?api_key=%s&language=pt-PT&external_source=imdb_id", rawID, apiKey)
-		findResp, err := http.Get(findURL)
-		if err != nil {
-			http.Error(w, "Erro ao converter IMDb ID", http.StatusInternalServerError)
-			return
-		}
-		defer findResp.Body.Close()
-
-		var findData map[string]interface{}
-		if err := json.NewDecoder(findResp.Body).Decode(&findData); err != nil {
-			http.Error(w, "Erro ao descodificar resposta", http.StatusInternalServerError)
-			return
-		}
-
-		resultKey := "movie_results"
-		if tmdbType == "tv" {
-			resultKey = "tv_results"
-		}
-		results, ok := findData[resultKey].([]interface{})
-		if !ok || len(results) == 0 {
-			http.Error(w, "Título não encontrado no TMDB via IMDb ID", http.StatusNotFound)
-			return
-		}
-		firstResult := results[0].(map[string]interface{})
-		idFloat, ok := firstResult["id"].(float64)
-		if !ok {
-			http.Error(w, "ID do TMDB inválido", http.StatusInternalServerError)
-			return
-		}
-		tmdbID = fmt.Sprintf("%d", int(idFloat))
-	}
-
-	detailURL := fmt.Sprintf("https://api.themoviedb.org/3/%s/%s?api_key=%s&language=pt-PT", tmdbType, tmdbID, apiKey)
-	resp, err := http.Get(detailURL)
-	if err != nil {
-		http.Error(w, "Erro ao consultar TMDB", http.StatusInternalServerError)
-		return
-	}
-	defer resp.Body.Close()
-
-	w.Header().Set("Content-Type", "application/json")
-	io.Copy(w, resp.Body)
-}
-
-// === API DE PEDIDOS ===
-type PedidoRequest struct {
-	Nome   string `json:"nome"`
-	Titulo string `json:"titulo"`
-	Tipo   string `json:"tipo"`
-}
-
-func handlePedidos(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Content-Type", "application/json")
-
-	if r.Method == http.MethodGet {
-		pedidosPath := filepath.Join(dataDir, "_pedidos.json")
-		rawBytes, err := os.ReadFile(pedidosPath)
-		if err != nil {
-			w.Write([]byte("[]"))
-			return
-		}
-
-		var todos []map[string]interface{}
-		if err := json.Unmarshal(rawBytes, &todos); err != nil {
-			w.Write([]byte("[]"))
-			return
-		}
-
-		filtroTipo := r.URL.Query().Get("tipo")
-		if filtroTipo != "" && filtroTipo != "all" {
-			var filtrado []map[string]interface{}
-			for _, p := range todos {
-				if fmt.Sprintf("%v", p["tipo"]) == filtroTipo {
-					filtrado = append(filtrado, p)
+		// 2. Se acharmos um IMDb ID válido, processa os metadados
+		if imdbID != "" {
+			// Busca dados no TMDB
+			info := getTMDBInfo(imdbID, httpClient)
+			if info.Title != "" {
+				data["title"] = info.Title
+				data["year"] = info.Year
+				if _, exists := data["type"]; !exists {
+					data["type"] = info.Type
 				}
 			}
-			if filtrado == nil {
-				filtrado = []map[string]interface{}{}
+			
+			// Determina o tipo (movie ou series)
+			cType := "movie"
+			if t, ok := data["type"].(string); ok && t != "" {
+				cType = t
 			}
-			out, _ := json.Marshal(filtrado)
-			w.Write(out)
-			return
+
+			// Busca dados no Cinemeta (Stremio)
+			cinemeta := getCinemetaInfo(imdbID, cType, httpClient)
+			if cinemeta != nil {
+				if videos, ok := cinemeta["videos"]; ok {
+					data["cinemetaVideos"] = videos
+				}
+				if desc, ok := cinemeta["description"]; ok && data["description"] == nil {
+					data["description"] = desc
+				}
+				if bg, ok := cinemeta["background"]; ok && data["background"] == nil {
+					data["background"] = bg
+				}
+			}
+			
+			// Injeta a capa do RPDB
+			if data["poster"] == nil {
+				data["poster"] = fmt.Sprintf("%s/imdb/poster-default/%s.jpg", RPDBBaseURL, imdbID)
+			}
+			
+			// Garante que o ID está presente
+			if _, exists := data["id"]; !exists {
+				data["id"] = imdbID
+			}
 		}
 
-		w.Write(rawBytes)
+		// Reconstrói a string JSON sempre (mesmo se falhar o enriquecimento, preserva o JSON limpo)
+		if enrichedBytes, err := json.Marshal(data); err == nil {
+			conteudo = string(enrichedBytes)
+		}
+	}
+	// =========================================================================
+
+	query := `
+		INSERT INTO arquivos_json (nome, conteudo) 
+		VALUES ($1, $2)
+		ON CONFLICT (nome) DO UPDATE SET conteudo = EXCLUDED.conteudo;
+	`
+	_, err := db.Exec(query, nome, conteudo)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(fmt.Sprintf(`{"erro": "%s"}`, err.Error())))
 		return
 	}
 
-	if r.Method == http.MethodPost {
-		var req PedidoRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, "Dados inválidos", http.StatusBadRequest)
-			return
-		}
-		if req.Nome == "" || req.Titulo == "" {
-			http.Error(w, "Nome e título são obrigatórios", http.StatusBadRequest)
-			return
-		}
-		if req.Tipo == "" {
-			req.Tipo = "desconhecido"
-		}
-
-		pedidosPath := filepath.Join(dataDir, "_pedidos.json")
-		var pedidos []map[string]interface{}
-		if existing, err := os.ReadFile(pedidosPath); err == nil {
-			json.Unmarshal(existing, &pedidos)
-		}
-
-		tituloNorm := strings.ToLower(strings.TrimSpace(req.Titulo))
-		found := false
-		for i, p := range pedidos {
-			if strings.ToLower(fmt.Sprintf("%v", p["titulo"])) == tituloNorm {
-				count := 1.0
-				if c, ok := p["pedidos"].(float64); ok {
-					count = c
-				}
-				pedidos[i]["pedidos"] = count + 1
-				if req.Tipo != "desconhecido" {
-					pedidos[i]["tipo"] = req.Tipo
-				}
-				solicitantes, _ := pedidos[i]["solicitantes"].([]interface{})
-				pedidos[i]["solicitantes"] = append(solicitantes, req.Nome)
-				found = true
-				break
-			}
-		}
-
-		if !found {
-			pedidos = append(pedidos, map[string]interface{}{
-				"titulo":       req.Titulo,
-				"tipo":         req.Tipo,
-				"pedidos":      1,
-				"solicitantes": []string{req.Nome},
-			})
-		}
-
-		out, _ := json.MarshalIndent(pedidos, "", "    ")
-		os.WriteFile(pedidosPath, out, 0644)
-
-		txtPath := filepath.Join(dataDir, "_pedidos.txt")
-		var txtLines []string
-		txtLines = append(txtLines, "=== PEDIDOS FENIXFLIX ===\n")
-		for _, p := range pedidos {
-			titulo := fmt.Sprintf("%v", p["titulo"])
-			tipo := fmt.Sprintf("%v", p["tipo"])
-			countStr := "1"
-			if c, ok := p["pedidos"].(float64); ok {
-				countStr = fmt.Sprintf("%.0f", c)
-			}
-			solicitantes := []interface{}{}
-			if s, ok := p["solicitantes"].([]interface{}); ok {
-				solicitantes = s
-			}
-			var nomes []string
-			for _, s := range solicitantes {
-				nomes = append(nomes, fmt.Sprintf("%v", s))
-			}
-			txtLines = append(txtLines, fmt.Sprintf("📌 %s [%s] — %s pedido(s) por: %s", titulo, tipo, countStr, strings.Join(nomes, ", ")))
-		}
-		os.WriteFile(txtPath, []byte(strings.Join(txtLines, "\n")), 0644)
-
-		w.Write([]byte(`{"status":"success","message":"Pedido registado com sucesso!"}`))
-		return
-	}
-
-	http.Error(w, "Método não permitido", http.StatusMethodNotAllowed)
+	w.Write([]byte(fmt.Sprintf(`{"sucesso": true, "mensagem": "'%s' salvo com sucesso na base de dados!"}`, nome)))
 }
 
-// Upload Múltiplo
-func handleBulkUpload(w http.ResponseWriter, r *http.Request) {
+// 2. Rota para apagar (Protegida)
+func deleteHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	
+	if db == nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(`{"erro": "Servidor offline"}`))
+		return
+	}
+
 	if r.Method != http.MethodPost {
-		http.Error(w, "Método não permitido", http.StatusMethodNotAllowed)
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		w.Write([]byte(`{"erro": "Método não permitido"}`))
 		return
 	}
 
-	err := r.ParseMultipartForm(10 << 20)
+	var reqData struct {
+		ID    string `json:"id"`
+		Senha string `json:"senha"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&reqData); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte(`{"erro": "Dados inválidos"}`))
+		return
+	}
+
+	adminPassword := os.Getenv("ADMIN_PASSWORD")
+	if adminPassword == "" {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(`{"erro": "Erro de Segurança: ADMIN_PASSWORD não configurada no servidor!"}`))
+		return
+	}
+
+	if reqData.Senha != adminPassword {
+		w.WriteHeader(http.StatusForbidden)
+		w.Write([]byte(`{"erro": "Acesso negado: Palavra-passe incorreta"}`))
+		return
+	}
+
+	_, err := db.Exec("DELETE FROM arquivos_json WHERE nome = $1", reqData.ID)
 	if err != nil {
-		http.Error(w, "Erro ao processar formulário", http.StatusBadRequest)
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(fmt.Sprintf(`{"erro": "%s"}`, err.Error())))
 		return
 	}
 
-	files := r.MultipartForm.File["jsons"]
-	if len(files) == 0 {
-		http.Error(w, "Nenhum ficheiro enviado", http.StatusBadRequest)
+	w.Write([]byte(`{"sucesso": true}`))
+}
+
+// 3. Rota para listar todos (Catálogo)
+func listAllHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	if db == nil {
+		http.Error(w, `[{"erro": "Base de dados offline"}]`, http.StatusInternalServerError)
 		return
 	}
 
-	for _, fileHeader := range files {
-		if !strings.HasSuffix(fileHeader.Filename, ".json") {
-			continue
-		}
+	rows, err := db.Query("SELECT conteudo FROM arquivos_json ORDER BY data_criacao DESC")
+	if err != nil {
+		http.Error(w, `[{"erro": "Falha ao buscar ficheiros"}]`, http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
 
-		file, err := fileHeader.Open()
-		if err != nil {
-			continue
+	w.Write([]byte("["))
+	first := true
+	for rows.Next() {
+		var conteudo string
+		if err := rows.Scan(&conteudo); err == nil {
+			if !first {
+				w.Write([]byte(","))
+			}
+			w.Write([]byte(conteudo))
+			first = false
 		}
-		defer file.Close()
+	}
+	w.Write([]byte("]"))
+}
 
-		destPath := filepath.Join(dataDir, filepath.Base(fileHeader.Filename))
-		destFile, err := os.Create(destPath)
-		if err != nil {
-			continue
-		}
-		defer destFile.Close()
+// 4. Rota do Contador
+func countHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
 
-		io.Copy(destFile, file)
+	if db == nil {
+		http.Error(w, `{"erro": "Banco offline"}`, http.StatusInternalServerError)
+		return
+	}
+
+	var total int
+	err := db.QueryRow("SELECT COUNT(*) FROM arquivos_json").Scan(&total)
+	if err != nil {
+		http.Error(w, `{"erro": "Falha ao contar ficheiros"}`, http.StatusInternalServerError)
+		return
+	}
+
+	w.Write([]byte(fmt.Sprintf(`{"total_jsons": %d}`, total)))
+}
+
+// 5. Rota Dinâmica (Serve o index.html OU o JSON)
+func rootHandler(w http.ResponseWriter, r *http.Request) {
+	path := r.URL.Path
+
+	if path == "/" || path == "/index.html" {
+		http.ServeFile(w, r, "index.html")
+		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	w.Write([]byte(`{"status":"success","message":"Ficheiros enviados com sucesso!"}`))
-}
 
-// === FAZER PEDIDO PELO URL ===
-func handlePedidoPorURL(w http.ResponseWriter, r *http.Request) {
-	titulo := strings.TrimPrefix(r.URL.Path, "/pedido/")
-	if titulo == "" || titulo == "/" {
-		http.Error(w, "Precisa de informar o título ou ID no URL. Exemplo: /pedido/tt0066921", http.StatusBadRequest)
+	if db == nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(`{"erro": "Servidor offline ou sem base de dados configurada"}`))
+		return
+	}
+	
+	nome := strings.TrimPrefix(path, "/")
+	
+	var conteudo string
+	err := db.QueryRow("SELECT conteudo FROM arquivos_json WHERE nome = $1", nome).Scan(&conteudo)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			w.WriteHeader(http.StatusNotFound)
+			w.Write([]byte(`{"erro": "JSON não encontrado no servidor"}`))
+		} else {
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte(`{"erro": "Erro na base de dados"}`))
+		}
 		return
 	}
 
-	pedidosPath := filepath.Join(dataDir, "_pedidos.json")
-	var pedidos []map[string]interface{}
-	if existing, err := os.ReadFile(pedidosPath); err == nil {
-		json.Unmarshal(existing, &pedidos)
+	w.Write([]byte(conteudo))
+}
+
+// 6. Rota de Teste de Conexão
+func pingHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	
+	if db == nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(`{"status": "erro", "mensagem": "Base de dados não configurada (db está nulo)."}`))
+		return
 	}
 
-	tituloNorm := strings.ToLower(strings.TrimSpace(titulo))
-	found := false
-	nomeSolicitante := "Anónimo (Via URL)"
+	err := db.Ping()
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(fmt.Sprintf(`{"status": "erro", "mensagem": "A ligação ao PostgreSQL falhou: %v"}`, err)))
+		return
+	}
 
-	for i, p := range pedidos {
-		if strings.ToLower(fmt.Sprintf("%v", p["titulo"])) == tituloNorm {
-			count := 1.0
-			if c, ok := p["pedidos"].(float64); ok {
-				count = c
-			}
-			pedidos[i]["pedidos"] = count + 1
-			solicitantes, _ := pedidos[i]["solicitantes"].([]interface{})
-			pedidos[i]["solicitantes"] = append(solicitantes, nomeSolicitante)
-			found = true
-			break
+	w.Write([]byte(`{"status": "sucesso", "mensagem": "A comunicação com o PostgreSQL está a funcionar perfeitamente! 🚀"}`))
+}
+
+func corsMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS, DELETE")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+		if r.Method == "OPTIONS" {
+			w.WriteHeader(http.StatusOK)
+			return
 		}
-	}
-
-	if !found {
-		pedidos = append(pedidos, map[string]interface{}{
-			"titulo":       titulo,
-			"tipo":         "desconhecido",
-			"pedidos":      1,
-			"solicitantes": []string{nomeSolicitante},
-		})
-	}
-
-	out, _ := json.MarshalIndent(pedidos, "", "    ")
-	os.WriteFile(pedidosPath, out, 0644)
-
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Write([]byte(fmt.Sprintf(`
-		<body style="background-color: #09090b; margin: 0; font-family: sans-serif;">
-			<div style="text-align: center; margin-top: 50px; color: white; padding: 20px;">
-				<h2 style="color: #10b981;">✅ Pedido registado com sucesso!</h2>
-				<p style="color: #a1a1aa;">O título/ID <b style="color: white;">%s</b> foi adicionado à lista de pedidos.</p>
-				<a href="/" style="display: inline-block; margin-top: 20px; padding: 10px 20px; background: #4f46e5; color: white; text-decoration: none; border-radius: 8px; font-weight: bold;">Voltar ao Catálogo</a>
-			</div>
-		</body>
-	`, titulo)))
+		next.ServeHTTP(w, r)
+	})
 }
