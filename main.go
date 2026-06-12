@@ -157,9 +157,24 @@ func initDB() {
 	`
 	_, err = db.Exec(query)
 	if err != nil {
-		log.Fatalf("❌ Erro ao criar tabela: %v", err)
+		log.Fatalf("❌ Erro ao criar tabela arquivos_json: %v", err)
 	}
-	fmt.Println("✅ Banco de dados PostgreSQL conectado e tabela verificada.")
+
+	queryPedidos := `
+		CREATE TABLE IF NOT EXISTS pedidos_sugeridos (
+			id SERIAL PRIMARY KEY,
+			imdb_id VARCHAR(50) NOT NULL,
+			tipo VARCHAR(20) NOT NULL,
+			episodio VARCHAR(50),
+			criado_em TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+		)
+	`
+	_, err = db.Exec(queryPedidos)
+	if err != nil {
+		log.Fatalf("❌ Erro ao criar tabela pedidos_sugeridos: %v", err)
+	}
+
+	fmt.Println("✅ Banco de dados PostgreSQL conectado e tabelas verificadas.")
 }
 
 func main() {
@@ -174,6 +189,9 @@ func main() {
 	mux.HandleFunc("/count", countHandler)
 	mux.HandleFunc("/ping", pingHandler)
 	mux.HandleFunc("/api/stats", statsHandler)
+	mux.HandleFunc("/api/verify", verifyHandler)
+	mux.HandleFunc("/api/pedidos", pedidosHandler)
+	mux.HandleFunc("/api/pedidos/delete", deletePedidoHandler)
 	
 	mux.HandleFunc("/", rootHandler)
 
@@ -523,4 +541,201 @@ func corsMiddleware(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+// Handler para verificar a senha de administrador
+func verifyHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	var reqData struct {
+		Senha string `json:"senha"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&reqData); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte(`{"erro": "Dados inválidos"}`))
+		return
+	}
+
+	adminPassword := os.Getenv("ADMIN_PASSWORD")
+	if adminPassword == "" {
+		adminPassword = "sua_senha_padrao_aqui"
+	}
+
+	if reqData.Senha != adminPassword {
+		w.WriteHeader(http.StatusForbidden)
+		w.Write([]byte(`{"erro": "Senha incorreta"}`))
+		return
+	}
+
+	w.Write([]byte(`{"sucesso": true}`))
+}
+
+// Handler para gerenciar pedidos sugeridos (Adicionar e Listar)
+func pedidosHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	if db == nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(`{"erro": "Sem conexão com o banco"}`))
+		return
+	}
+
+	if r.Method == http.MethodPost {
+		var reqData struct {
+			ID      string  `json:"id"`
+			Type    string  `json:"type"`
+			Episode *string `json:"episode"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&reqData); err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			w.Write([]byte(`{"erro": "Dados inválidos"}`))
+			return
+		}
+		if reqData.ID == "" || reqData.Type == "" {
+			w.WriteHeader(http.StatusBadRequest)
+			w.Write([]byte(`{"erro": "ID e tipo são obrigatórios"}`))
+			return
+		}
+
+		query := `
+			INSERT INTO pedidos_sugeridos (imdb_id, tipo, episodio)
+			VALUES ($1, $2, $3)
+		`
+		_, err := db.Exec(query, reqData.ID, reqData.Type, reqData.Episode)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte(fmt.Sprintf(`{"erro": "%s"}`, err.Error())))
+			return
+		}
+		w.WriteHeader(http.StatusCreated)
+		w.Write([]byte(`{"sucesso": true, "mensagem": "Pedido registrado com sucesso!"}`))
+		return
+
+	} else if r.Method == http.MethodGet {
+		q := r.URL.Query()
+		id := q.Get("id")
+		tipo := q.Get("type")
+		episode := q.Get("episode")
+
+		// Se o usuário passar parâmetros de busca na URL (GET), ele quer criar um pedido direto pelo link do navegador
+		if id != "" && tipo != "" {
+			var epPtr *string
+			if episode != "" {
+				epPtr = &episode
+			}
+			queryInsert := `
+				INSERT INTO pedidos_sugeridos (imdb_id, tipo, episodio)
+				VALUES ($1, $2, $3)
+			`
+			_, err := db.Exec(queryInsert, id, tipo, epPtr)
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				w.Write([]byte(fmt.Sprintf(`{"erro": "%s"}`, err.Error())))
+				return
+			}
+			w.Write([]byte(fmt.Sprintf(`{"sucesso": true, "mensagem": "Pedido para o ID '%s' registrado com sucesso no banco de dados!"}`, id)))
+			return
+		}
+
+		query := `
+			SELECT 
+				imdb_id, 
+				tipo, 
+				COUNT(*),
+				COALESCE(
+					(
+						SELECT json_agg(DISTINCT ep) 
+						FROM (
+							SELECT episodio AS ep 
+							FROM pedidos_sugeridos p2 
+							WHERE p2.imdb_id = p.imdb_id AND p2.episodio IS NOT NULL
+						) sub
+					),
+					'[]'::json
+				)
+			FROM pedidos_sugeridos p
+			GROUP BY imdb_id, tipo
+			ORDER BY COUNT(*) DESC;
+		`
+		rows, err := db.Query(query)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte(fmt.Sprintf(`{"erro": "%s"}`, err.Error())))
+			return
+		}
+		defer rows.Close()
+
+		type PedidoResponse struct {
+			ID       string   `json:"id"`
+			Type     string   `json:"type"`
+			Count    int      `json:"count"`
+			Episodes []string `json:"episodes"`
+		}
+
+		var list []PedidoResponse
+		for rows.Next() {
+			var p PedidoResponse
+			var epsJSON string
+			if err := rows.Scan(&p.ID, &p.Type, &p.Count, &epsJSON); err == nil {
+				json.Unmarshal([]byte(epsJSON), &p.Episodes)
+				list = append(list, p)
+			}
+		}
+		if list == nil {
+			list = []PedidoResponse{}
+		}
+		json.NewEncoder(w).Encode(list)
+		return
+	} else {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+	}
+}
+
+// Handler para apagar pedidos sugeridos de um IMDb ID específico
+func deletePedidoHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	if db == nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(`{"erro": "Sem conexão com o banco"}`))
+		return
+	}
+
+	var reqData struct {
+		ID    string `json:"id"`
+		Senha string `json:"senha"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&reqData); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte(`{"erro": "Dados inválidos"}`))
+		return
+	}
+
+	adminPassword := os.Getenv("ADMIN_PASSWORD")
+	if adminPassword == "" {
+		adminPassword = "sua_senha_padrao_aqui"
+	}
+
+	if reqData.Senha != adminPassword {
+		w.WriteHeader(http.StatusForbidden)
+		w.Write([]byte(`{"erro": "Acesso negado: Senha incorreta"}`))
+		return
+	}
+
+	_, err := db.Exec("DELETE FROM pedidos_sugeridos WHERE imdb_id = $1", reqData.ID)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(fmt.Sprintf(`{"erro": "%s"}`, err.Error())))
+		return
+	}
+
+	w.Write([]byte(`{"sucesso": true}`))
 }

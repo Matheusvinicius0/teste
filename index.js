@@ -26,11 +26,21 @@ const initDB = async () => {
             criado_em TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
         );
     `;
+    const queryPedidos = `
+        CREATE TABLE IF NOT EXISTS pedidos_sugeridos (
+            id SERIAL PRIMARY KEY,
+            imdb_id VARCHAR(50) NOT NULL,
+            tipo VARCHAR(20) NOT NULL,
+            episodio VARCHAR(50),
+            criado_em TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        );
+    `;
     try {
         await pool.query(query);
-        console.log('Tabela de arquivos_json verificada/criada com sucesso.');
+        await pool.query(queryPedidos);
+        console.log('Tabelas de banco de dados verificadas/criadas com sucesso.');
     } catch (err) {
-        console.error('Erro ao criar tabela:', err);
+        console.error('Erro ao criar tabelas:', err);
     }
 };
 initDB();
@@ -146,6 +156,113 @@ app.get('/api/stats', async (req, res) => {
     } catch (err) {
         console.error(err);
         res.status(500).json({ erro: 'Erro ao buscar estatísticas do banco de dados.' });
+    }
+});
+
+// ==========================================
+// ROTA 6: Verificar Senha (/api/verify)
+// ==========================================
+app.post('/api/verify', (req, res) => {
+    const { senha } = req.body;
+    const adminPassword = process.env.ADMIN_PASSWORD || "sua_senha_padrao_aqui";
+
+    if (senha === adminPassword) {
+        return res.json({ sucesso: true });
+    }
+    return res.status(401).json({ erro: 'Senha incorreta.' });
+});
+
+// ==========================================
+// ROTA 7: Adicionar Pedido (/api/pedidos)
+// ==========================================
+app.post('/api/pedidos', async (req, res) => {
+    const { id, type, episode } = req.body;
+
+    if (!id || !type) {
+        return res.status(400).json({ erro: 'ID (IMDb) e tipo são obrigatórios.' });
+    }
+
+    try {
+        const query = `
+            INSERT INTO pedidos_sugeridos (imdb_id, tipo, episodio)
+            VALUES ($1, $2, $3)
+            RETURNING *;
+        `;
+        const values = [id, type, episode || null];
+        await pool.query(query, values);
+        res.status(201).json({ mensagem: 'Pedido registrado com sucesso!' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ erro: 'Erro ao registrar pedido no banco.' });
+    }
+});
+
+// ==========================================
+// ROTA 8: Listar e Somar Pedidos (/api/pedidos)
+// ==========================================
+app.get('/api/pedidos', async (req, res) => {
+    const { id, type, episode } = req.query;
+
+    // Se o usuário passou parâmetros de busca na URL (GET), ele quer criar um pedido direto pelo link do navegador
+    if (id && type) {
+        try {
+            const queryInsert = `
+                INSERT INTO pedidos_sugeridos (imdb_id, tipo, episodio)
+                VALUES ($1, $2, $3);
+            `;
+            await pool.query(queryInsert, [id, type, episode || null]);
+            return res.json({ sucesso: true, mensagem: `Pedido para o ID '${id}' registrado com sucesso no banco de dados!` });
+        } catch (err) {
+            console.error(err);
+            return res.status(500).json({ erro: 'Erro ao registrar pedido via URL.' });
+        }
+    }
+
+    // Caso contrário (sem parâmetros), apenas lista todos
+    try {
+        const query = `
+            SELECT 
+                imdb_id AS id, 
+                tipo AS type, 
+                COUNT(*)::int AS count,
+                COALESCE(
+                    array_to_json(array_remove(array_agg(DISTINCT episodio), NULL)),
+                    '[]'::json
+                ) AS episodes
+            FROM pedidos_sugeridos
+            GROUP BY imdb_id, tipo
+            ORDER BY count DESC;
+        `;
+        const result = await pool.query(query);
+        res.json(result.rows);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ erro: 'Erro ao buscar pedidos no banco.' });
+    }
+});
+
+// ==========================================
+// ROTA 9: Apagar Pedido (/api/pedidos/delete)
+// ==========================================
+app.post('/api/pedidos/delete', async (req, res) => {
+    const { id, senha } = req.body;
+    const adminPassword = process.env.ADMIN_PASSWORD || "sua_senha_padrao_aqui";
+
+    if (senha !== adminPassword) {
+        return res.status(401).json({ erro: 'Senha incorreta.' });
+    }
+
+    if (!id) {
+        return res.status(400).json({ erro: 'ID (IMDb) é obrigatório.' });
+    }
+
+    try {
+        const query = 'DELETE FROM pedidos_sugeridos WHERE imdb_id = $1;';
+        await pool.query(query, [id]);
+        res.json({ sucesso: true, mensagem: `Pedidos para o ID '${id}' removidos.` });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ erro: 'Erro ao apagar pedidos do banco.' });
     }
 });
 

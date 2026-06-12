@@ -95,7 +95,7 @@
                 <button onclick="switchView('generator')" id="btn-generator" class="nav-btn px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 hover:bg-zinc-900">
                     <i class="fa-solid fa-code"></i> <span class="hidden sm:inline">Criar JSON</span>
                 </button>
-                <button onclick="switchView('requests')" id="btn-requests" class="nav-btn px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 hover:bg-zinc-900">
+                <button onclick="switchView('requests'); reqProcessor.loadFromDB();" id="btn-requests" class="nav-btn px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 hover:bg-zinc-900">
                     <i class="fa-solid fa-list-check"></i> <span class="hidden md:inline">Pedidos</span>
                 </button>
                 <button onclick="switchView('catalog'); setTimeout(() => cat.filter('all'), 50);" id="btn-catalog" class="nav-btn active px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
@@ -169,7 +169,7 @@
                                 </div>
                             </div>
                             <div id="smartDetectHint" class="text-[11px] text-zinc-500 mt-3 flex items-center gap-1">
-                                <span class="text-zinc-300 font-medium">Smart Detect:</span> Cole "S01E01" ou "1x01" na lista de links para preenchimento inteligente.
+                                <span class="text-zinc-300 font-medium">Smart Detect:</span> Cole "T01EP01", "S01E01" ou "1x01" na lista de links para preenchimento inteligente.
                             </div>
                         </div>
 
@@ -365,7 +365,10 @@
                     </div>
                     
                     <div class="flex flex-wrap gap-3">
-                        <label class="cursor-pointer bg-white hover:bg-zinc-200 text-zinc-950 px-4 py-2 rounded-lg text-xs font-medium transition flex items-center gap-2">
+                        <button onclick="reqProcessor.loadFromDB()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg text-xs font-medium transition flex items-center gap-2">
+                            <i class="fa-solid fa-cloud-arrow-down"></i> Carregar do Banco
+                        </button>
+                        <label class="cursor-pointer bg-zinc-800 hover:bg-zinc-700 text-white px-4 py-2 rounded-lg text-xs font-medium border border-zinc-700 transition flex items-center gap-2">
                             Ler TXT
                             <input type="file" accept=".txt" class="hidden" onchange="reqProcessor.handleUpload(this)">
                         </label>
@@ -373,7 +376,7 @@
                             Restaurar JSON
                             <input type="file" accept=".json" class="hidden" onchange="reqProcessor.handleJsonUpload(this)">
                         </label>
-                        <button onclick="reqProcessor.clearData()" class="bg-zinc-950 hover:bg-red-950 text-zinc-400 hover:text-red-400 border border-zinc-800 hover:border-red-900 px-3 py-2 rounded-lg transition flex items-center justify-center">
+                        <button onclick="reqProcessor.clearData()" class="bg-zinc-950 hover:bg-red-950 text-zinc-400 hover:text-red-400 border border-zinc-800 hover:border-red-900 px-3 py-2 rounded-lg transition flex items-center justify-center" title="Limpar Tudo">
                             <i class="fa-solid fa-trash-can"></i>
                         </button>
                     </div>
@@ -618,6 +621,47 @@
         }
 
         const escapeHTML = str => (str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/\n/g, '&#10;');
+
+        async function getValidPassword(promptMessage) {
+            const cachedSenha = sessionStorage.getItem('fenixflix_senha');
+            if (cachedSenha) {
+                try {
+                    const response = await fetch('/api/verify', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ senha: cachedSenha })
+                    });
+                    if (response.ok) {
+                        return cachedSenha;
+                    }
+                } catch (e) {
+                    console.error("Erro ao verificar senha cacheada:", e);
+                }
+            }
+            
+            const senha = prompt(promptMessage || "Digite a senha do sistema:");
+            if (!senha) return null;
+            
+            try {
+                const response = await fetch('/api/verify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ senha: senha })
+                });
+                
+                if (response.ok) {
+                    sessionStorage.setItem('fenixflix_senha', senha);
+                    return senha;
+                } else {
+                    const errData = await response.json();
+                    showToast("Erro: " + (errData.erro || "Senha incorreta"), "error");
+                    return null;
+                }
+            } catch (e) {
+                showToast("Erro ao conectar com o servidor para validar a senha", "error");
+                return null;
+            }
+        }
 
         function switchView(viewName) {
             document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
@@ -1030,6 +1074,13 @@
                 if (seasonCol) seasonCol.style.display = showSeries ? 'block' : 'none';
                 if (startEpCol) startEpCol.style.display = showSeries ? 'block' : 'none';
                 if (smartHint) smartHint.style.display = showSeries ? 'flex' : 'none';
+                
+                if (showSeries) {
+                    const linksInput = document.getElementById('manualLinks');
+                    if (linksInput && !linksInput.value.trim()) {
+                        linksInput.value = "T01EP01\n";
+                    }
+                }
             },
             loadExistingJson: (input) => {
                 const file = input.files[0];
@@ -1149,10 +1200,10 @@
                     let currentSmartEp = null;
 
                     lines.forEach(line => {
-                        const sxeMatch = line.match(/S(\d+)\s*E(\d+)|(\d+)x(\d+)/i);
+                        const sxeMatch = line.match(/S(\d+)\s*E(\d+)|T(\d+)\s*EP?(\d+)|(\d+)x(\d+)/i);
                         if (sxeMatch) {
-                            const s = parseInt(sxeMatch[1] || sxeMatch[3]).toString();
-                            const e = parseInt(sxeMatch[2] || sxeMatch[4]).toString();
+                            const s = parseInt(sxeMatch[1] || sxeMatch[3] || sxeMatch[5]).toString();
+                            const e = parseInt(sxeMatch[2] || sxeMatch[4] || sxeMatch[6]).toString();
                             currentSmartSeason = s;
                             currentSmartEp = e;
                             return; 
@@ -1275,7 +1326,7 @@
             uploadParaBanco: async () => {
                 if (!gen.currentData) return showToast("Nenhum JSON para enviar!", "warning");
                 
-                const senha = prompt("Digite a senha do sistema para salvar no banco:");
+                const senha = await getValidPassword("Digite a senha do sistema para salvar no banco:");
                 if (!senha) return;
 
                 const nomeArquivo = gen.currentData.id;
@@ -1509,7 +1560,10 @@
                 cat.renderFiltered();
             },
 
-            editInGenerator: (id) => {
+            editInGenerator: async (id) => {
+                const senha = await getValidPassword("Digite a senha do sistema para editar este item:");
+                if (!senha) return;
+
                 const item = cat.allItems.find(i => i.id === id);
                 if (!item) return;
 
@@ -1521,10 +1575,10 @@
 
                 if (item.type === 'series' && Array.isArray(item.streams)) {
                     item.streams.forEach(str => {
-                        const match = str.name.match(/S(\d+)E(\d+)/i);
+                        const match = str.name.match(/S(\d+)E(\d+)|T(\d+)EP?(\d+)/i);
                         if (match) {
-                            const s = parseInt(match[1]).toString();
-                            const e = parseInt(match[2]).toString();
+                            const s = parseInt(match[1] || match[3]).toString();
+                            const e = parseInt(match[2] || match[4]).toString();
                             if(!exportData.streams[s]) exportData.streams[s] = {};
                             if(!exportData.streams[s][e]) exportData.streams[s][e] = [];
                             
@@ -1559,10 +1613,10 @@
 
                 if (item.type === 'series' && Array.isArray(item.streams)) {
                     item.streams.forEach(str => {
-                        const match = str.name.match(/S(\d+)E(\d+)/i);
+                        const match = str.name.match(/S(\d+)E(\d+)|T(\d+)EP?(\d+)/i);
                         if (match) {
-                            const s = parseInt(match[1]).toString();
-                            const e = parseInt(match[2]).toString();
+                            const s = parseInt(match[1] || match[3]).toString();
+                            const e = parseInt(match[2] || match[4]).toString();
                             if(!exportData.streams[s]) exportData.streams[s] = {};
                             if(!exportData.streams[s][e]) exportData.streams[s][e] = [];
                             
@@ -1583,7 +1637,7 @@
             },
 
             deleteItem: async (id) => {
-                const senha = prompt(`Digite a senha do sistema para apagar o ficheiro ${id}:`);
+                const senha = await getValidPassword(`Digite a senha do sistema para apagar o ficheiro ${id}:`);
                 if (!senha) return;
                 
                 if(!confirm(`Tem a certeza absoluta que quer apagar ${id}? Esta ação é irreversível.`)) return;
@@ -1714,7 +1768,7 @@
                 const files = input.files;
                 if (!files || files.length === 0) return;
 
-                const senha = prompt(`Vai enviar ${files.length} ficheiro(s) JSON. Digite a senha do sistema:`);
+                const senha = await getValidPassword(`Vai enviar ${files.length} ficheiro(s) JSON. Digite a senha do sistema:`);
                 if (!senha) {
                     input.value = ""; 
                     return;
@@ -2039,12 +2093,76 @@
                 container.innerHTML = html || '<div class="text-center py-8 text-zinc-600 text-sm">Nenhum resultado.</div>';
             },
 
-            removeItem: (id) => {
-                if(reqProcessor.parsedItems.has(id)) {
+            removeItem: async (id) => {
+                if (confirm(`Quer remover o pedido do ID ${id} do banco de dados permanente?`)) {
+                    const senha = await getValidPassword("Digite a senha do sistema para confirmar a exclusão do pedido:");
+                    if (!senha) return;
+                    
+                    try {
+                        const response = await fetch('/api/pedidos/delete', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ id: id, senha: senha })
+                        });
+                        
+                        if (response.ok) {
+                            showToast("Pedido removido com sucesso!", "success");
+                            reqProcessor.parsedItems.delete(id);
+                            reqProcessor.updateUI();
+                            reqProcessor.renderList();
+                            if(reqProcessor.parsedItems.size === 0) reqProcessor.clearData();
+                        } else {
+                            const err = await response.json();
+                            showToast("Erro: " + err.erro, "error");
+                        }
+                    } catch (e) {
+                        showToast("Erro ao conectar ao servidor", "error");
+                    }
+                } else {
+                    // Remove apenas local
                     reqProcessor.parsedItems.delete(id);
                     reqProcessor.updateUI();
                     reqProcessor.renderList();
                     if(reqProcessor.parsedItems.size === 0) reqProcessor.clearData();
+                }
+            },
+
+            loadFromDB: async () => {
+                const statusEl = document.getElementById('req-loading-status');
+                if (statusEl) statusEl.innerHTML = `<span class="loader inline-block w-3 h-3 mr-2 border-zinc-500 border-t-zinc-300"></span> Carregando do Banco`;
+                
+                try {
+                    const response = await fetch('/api/pedidos');
+                    if (!response.ok) throw new Error("Falha na API");
+                    const data = await response.json();
+                    
+                    reqProcessor.parsedItems.clear();
+                    let totalLines = 0;
+                    
+                    data.forEach(item => {
+                        reqProcessor.parsedItems.set(item.id, {
+                            id: item.id,
+                            type: item.type,
+                            title: "Buscando...",
+                            missingEps: new Set(item.episodes || []),
+                            count: item.count || 1
+                        });
+                        totalLines += (item.count || 1);
+                    });
+                    
+                    reqProcessor.totalLinesRead = totalLines;
+                    reqProcessor.updateUI();
+                    
+                    if (reqProcessor.parsedItems.size > 0) {
+                        await reqProcessor.fetchTitlesFromTMDB();
+                    } else {
+                        if (statusEl) statusEl.innerText = `Nenhum pedido no banco`;
+                        document.getElementById('req-results-container').innerHTML = `<div class="text-center py-12 text-zinc-600"><p class="text-sm font-medium">Nenhum pedido sugerido no banco de dados.</p></div>`;
+                    }
+                    reqProcessor.renderList();
+                } catch (error) {
+                    showToast("Erro ao carregar pedidos do banco", "error");
+                    if (statusEl) statusEl.innerText = `Erro de conexão`;
                 }
             },
 
@@ -2226,8 +2344,29 @@
         }
 
         // Start by loading the catalog automatically on page load
-        document.addEventListener('DOMContentLoaded', () => {
-            cat.init();
+        document.addEventListener('DOMContentLoaded', async () => {
+            await cat.init();
+            
+            // Verifica o parâmetro "pedido" ou "pedio" na URL
+            const params = new URLSearchParams(window.location.search);
+            const pedido = params.get('pedido') || params.get('pedio');
+            if (pedido) {
+                const id = pedido.trim();
+                const input = document.getElementById('contentId');
+                if (input) {
+                    input.value = id;
+                    switchView('generator');
+                    
+                    // Se já existir no catálogo, carrega para editar
+                    const existingItem = cat.allItems.find(i => i.id === id);
+                    if (existingItem) {
+                        cat.editInGenerator(id);
+                    } else {
+                        // Caso contrário, faz a busca inteligente
+                        gen.smartSearch();
+                    }
+                }
+            }
         });
 
     </script>
