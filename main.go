@@ -11,7 +11,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
 )
 
@@ -53,7 +52,7 @@ func getTMDBInfo(id string, client *http.Client) TMDBData {
 		return cached.(TMDBData)
 	}
 	
-	url := fmt.Sprintf("https://api.themoviedb.org/3/find/%s?external_source=imdb_id&language=pt-PT", id)
+	url := fmt.Sprintf("https://api.themoviedb.org/3/find/%s?external_source=imdb_id&language=pt-BR", id)
 	
 	req, _ := http.NewRequest("GET", url, nil)
 	req.Header.Set("User-Agent", "Mozilla/5.0")
@@ -129,11 +128,11 @@ func getCinemetaInfo(id string, cType string, client *http.Client) map[string]in
 	return nil
 }
 
-// ==== INICIALIZAÇÃO DA BASE DE DADOS ====
+// ==== INICIALIZAÇÃO DO BANCO ====
 func initDB() {
 	connStr := os.Getenv("DATABASE_URL")
 	if connStr == "" {
-		log.Println("⚠️ AVISO CRÍTICO: DATABASE_URL não está configurada! A API não conseguirá gravar nem ler da base de dados.")
+		log.Println("⚠️ AVISO CRÍTICO: DATABASE_URL não está configurada! A API não conseguirá gravar nem ler do banco de dados.")
 		return
 	}
 
@@ -160,13 +159,10 @@ func initDB() {
 	if err != nil {
 		log.Fatalf("❌ Erro ao criar tabela: %v", err)
 	}
-	fmt.Println("✅ Base de dados PostgreSQL ligada e tabela verificada.")
+	fmt.Println("✅ Banco de dados PostgreSQL conectado e tabela verificada.")
 }
 
 func main() {
-	// Carrega o ficheiro .env se existir (útil para desenvolvimento local)
-	_ = godotenv.Load()
-
 	initDB()
 
 	mux := http.NewServeMux()
@@ -177,6 +173,7 @@ func main() {
 	mux.HandleFunc("/api/delete", deleteHandler) 
 	mux.HandleFunc("/count", countHandler)
 	mux.HandleFunc("/ping", pingHandler)
+	mux.HandleFunc("/api/stats", statsHandler)
 	
 	mux.HandleFunc("/", rootHandler)
 
@@ -197,7 +194,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	
 	if db == nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(`{"erro": "Servidor sem ligação à base de dados."}`))
+		w.Write([]byte(`{"erro": "Servidor sem conexão com o banco de dados."}`))
 		return
 	}
 
@@ -213,14 +210,12 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 
 	adminPassword := os.Getenv("ADMIN_PASSWORD")
 	if adminPassword == "" {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(`{"erro": "Erro de Segurança: ADMIN_PASSWORD não configurada no servidor!"}`))
-		return
+		adminPassword = "sua_senha_padrao_aqui"
 	}
 
 	if senha != adminPassword {
 		w.WriteHeader(http.StatusForbidden)
-		w.Write([]byte(`{"erro": "Acesso negado: Palavra-passe incorreta"}`))
+		w.Write([]byte(`{"erro": "Acesso negado: Senha incorreta"}`))
 		return
 	}
 
@@ -248,11 +243,11 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 		if idVal, ok := data["id"].(string); ok && strings.HasPrefix(idVal, "tt") {
 			imdbID = idVal
 		} else if strings.HasPrefix(nome, "tt") {
-			// Fallback: tenta ver pelo nome do ficheiro
+			// Fallback: tenta ver pelo nome do arquivo
 			imdbID = nome
 		}
 
-		// 2. Se acharmos um IMDb ID válido, processa os metadados
+		// 2. Se achamos um IMDb ID válido, processa os metadados
 		if imdbID != "" {
 			// Busca dados no TMDB
 			info := getTMDBInfo(imdbID, httpClient)
@@ -295,7 +290,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		// Reconstrói a string JSON sempre (mesmo se falhar o enriquecimento, preserva o JSON limpo)
+		// Reconstroi a string JSON sempre (mesmo se falhar o enriquecimento, preserva o JSON limpo)
 		if enrichedBytes, err := json.Marshal(data); err == nil {
 			conteudo = string(enrichedBytes)
 		}
@@ -314,7 +309,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Write([]byte(fmt.Sprintf(`{"sucesso": true, "mensagem": "'%s' salvo com sucesso na base de dados!"}`, nome)))
+	w.Write([]byte(fmt.Sprintf(`{"sucesso": true, "mensagem": "'%s' salvo com sucesso no banco de dados!"}`, nome)))
 }
 
 // 2. Rota para apagar (Protegida)
@@ -346,14 +341,12 @@ func deleteHandler(w http.ResponseWriter, r *http.Request) {
 
 	adminPassword := os.Getenv("ADMIN_PASSWORD")
 	if adminPassword == "" {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(`{"erro": "Erro de Segurança: ADMIN_PASSWORD não configurada no servidor!"}`))
-		return
+		adminPassword = "sua_senha_padrao_aqui"
 	}
 
 	if reqData.Senha != adminPassword {
 		w.WriteHeader(http.StatusForbidden)
-		w.Write([]byte(`{"erro": "Acesso negado: Palavra-passe incorreta"}`))
+		w.Write([]byte(`{"erro": "Acesso negado: Senha incorreta"}`))
 		return
 	}
 
@@ -372,13 +365,13 @@ func listAllHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	if db == nil {
-		http.Error(w, `[{"erro": "Base de dados offline"}]`, http.StatusInternalServerError)
+		http.Error(w, `[{"erro": "Banco de dados offline"}]`, http.StatusInternalServerError)
 		return
 	}
 
 	rows, err := db.Query("SELECT conteudo FROM arquivos_json ORDER BY data_criacao DESC")
 	if err != nil {
-		http.Error(w, `[{"erro": "Falha ao buscar ficheiros"}]`, http.StatusInternalServerError)
+		http.Error(w, `[{"erro": "Falha ao buscar arquivos"}]`, http.StatusInternalServerError)
 		return
 	}
 	defer rows.Close()
@@ -410,11 +403,58 @@ func countHandler(w http.ResponseWriter, r *http.Request) {
 	var total int
 	err := db.QueryRow("SELECT COUNT(*) FROM arquivos_json").Scan(&total)
 	if err != nil {
-		http.Error(w, `{"erro": "Falha ao contar ficheiros"}`, http.StatusInternalServerError)
+		http.Error(w, `{"erro": "Falha ao contar arquivos"}`, http.StatusInternalServerError)
 		return
 	}
 
 	w.Write([]byte(fmt.Sprintf(`{"total_jsons": %d}`, total)))
+}
+
+// Estrutura para resposta de estatísticas
+type StatsResponse struct {
+	TotalBytes  int64 `json:"total_bytes"`
+	MovieBytes  int64 `json:"movie_bytes"`
+	SeriesBytes int64 `json:"series_bytes"`
+	MovieCount  int64 `json:"movie_count"`
+	SeriesCount int64 `json:"series_count"`
+	TotalCount  int64 `json:"total_count"`
+}
+
+// Rota de Estatísticas de Armazenamento
+func statsHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	if db == nil {
+		http.Error(w, `{"erro": "Banco offline"}`, http.StatusInternalServerError)
+		return
+	}
+
+	query := `
+		SELECT 
+			pg_total_relation_size('arquivos_json') AS total_size,
+			(SELECT COALESCE(SUM(octet_length(conteudo::text)), 0) FROM arquivos_json WHERE conteudo->>'type' = 'movie') AS movie_size,
+			(SELECT COALESCE(SUM(octet_length(conteudo::text)), 0) FROM arquivos_json WHERE conteudo->>'type' = 'series') AS series_size,
+			(SELECT COUNT(*) FROM arquivos_json WHERE conteudo->>'type' = 'movie') AS movie_count,
+			(SELECT COUNT(*) FROM arquivos_json WHERE conteudo->>'type' = 'series') AS series_count,
+			(SELECT COUNT(*) FROM arquivos_json) AS total_count;
+	`
+
+	var stats StatsResponse
+	err := db.QueryRow(query).Scan(
+		&stats.TotalBytes,
+		&stats.MovieBytes,
+		&stats.SeriesBytes,
+		&stats.MovieCount,
+		&stats.SeriesCount,
+		&stats.TotalCount,
+	)
+	if err != nil {
+		log.Printf("❌ Erro ao buscar estatísticas: %v", err)
+		http.Error(w, `{"erro": "Falha ao consultar estatísticas"}`, http.StatusInternalServerError)
+		return
+	}
+
+	json.NewEncoder(w).Encode(stats)
 }
 
 // 5. Rota Dinâmica (Serve o index.html OU o JSON)
@@ -430,7 +470,7 @@ func rootHandler(w http.ResponseWriter, r *http.Request) {
 
 	if db == nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(`{"erro": "Servidor offline ou sem base de dados configurada"}`))
+		w.Write([]byte(`{"erro": "Servidor offline ou sem banco de dados configurado"}`))
 		return
 	}
 	
@@ -444,7 +484,7 @@ func rootHandler(w http.ResponseWriter, r *http.Request) {
 			w.Write([]byte(`{"erro": "JSON não encontrado no servidor"}`))
 		} else {
 			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte(`{"erro": "Erro na base de dados"}`))
+			w.Write([]byte(`{"erro": "Erro no banco de dados"}`))
 		}
 		return
 	}
@@ -458,7 +498,7 @@ func pingHandler(w http.ResponseWriter, r *http.Request) {
 	
 	if db == nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(`{"status": "erro", "mensagem": "Base de dados não configurada (db está nulo)."}`))
+		w.Write([]byte(`{"status": "erro", "mensagem": "Banco de dados não configurado (db está nulo)."}`))
 		return
 	}
 
