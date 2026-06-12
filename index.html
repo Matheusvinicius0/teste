@@ -447,20 +447,48 @@
                     </div>
 
                     <!-- Gráfico de Uso Geral -->
-                    <div class="space-y-4">
-                        <div class="flex justify-between items-end text-sm">
-                            <span class="text-zinc-400 font-medium">Espaço Utilizado</span>
-                            <span id="storage-percent-text" class="text-white font-semibold text-lg">0%</span>
+                    <div class="flex flex-col md:flex-row items-center gap-8 py-4">
+                        <!-- Círculo do Gráfico de Pizza (Donut) -->
+                        <div class="relative shrink-0">
+                            <div id="storage-pie-chart" class="w-36 h-36 rounded-full border border-zinc-800 shadow-inner" style="background: conic-gradient(#6366f1 0% 0%, #a855f7 0% 0%, #27272a 0% 100%);"></div>
+                            <div class="absolute inset-4 bg-zinc-900 rounded-full flex flex-col items-center justify-center border border-zinc-800/50">
+                                <span id="storage-donut-percent" class="text-white font-semibold text-lg">0.00%</span>
+                                <span class="text-[9px] text-zinc-500 uppercase font-medium">Usado</span>
+                            </div>
                         </div>
-                        
-                        <!-- Barra de progresso principal -->
-                        <div class="w-full bg-zinc-950 h-4 rounded-full overflow-hidden border border-zinc-850 p-0.5">
-                            <div id="storage-progress-bar" class="bg-gradient-to-r from-indigo-500 to-purple-600 h-full rounded-full transition-all duration-500" style="width: 0%;"></div>
-                        </div>
-                        
-                        <div class="flex justify-between text-xs text-zinc-500 font-mono">
-                            <span id="storage-used-text">0.00 MB</span>
-                            <span>1.00 GB (Limite)</span>
+
+                        <!-- Barra de progresso e informações textuais -->
+                        <div class="flex-grow space-y-4 w-full">
+                            <div class="flex justify-between items-end text-sm">
+                                <span class="text-zinc-400 font-medium">Espaço Utilizado</span>
+                                <span id="storage-percent-text" class="text-white font-semibold text-lg">0%</span>
+                            </div>
+                            
+                            <!-- Barra de progresso principal -->
+                            <div class="w-full bg-zinc-950 h-3 rounded-full overflow-hidden border border-zinc-850 p-0.5">
+                                <div id="storage-progress-bar" class="bg-gradient-to-r from-indigo-500 to-purple-600 h-full rounded-full transition-all duration-500" style="width: 0%;"></div>
+                            </div>
+                            
+                            <!-- Legenda do Gráfico -->
+                            <div class="flex flex-wrap gap-x-4 gap-y-2 text-xs">
+                                <div class="flex items-center gap-1.5">
+                                    <span class="w-2.5 h-2.5 rounded-full bg-indigo-500"></span>
+                                    <span class="text-zinc-400">Séries: <span id="legend-series-pct" class="text-zinc-200 font-semibold">0.00%</span></span>
+                                </div>
+                                <div class="flex items-center gap-1.5">
+                                    <span class="w-2.5 h-2.5 rounded-full bg-purple-500"></span>
+                                    <span class="text-zinc-400">Filmes: <span id="legend-movies-pct" class="text-zinc-200 font-semibold">0.00%</span></span>
+                                </div>
+                                <div class="flex items-center gap-1.5">
+                                    <span class="w-2.5 h-2.5 rounded-full bg-zinc-700"></span>
+                                    <span class="text-zinc-400">Livre: <span id="legend-free-pct" class="text-zinc-200 font-semibold">100.00%</span></span>
+                                </div>
+                            </div>
+
+                            <div class="flex justify-between text-[11px] text-zinc-500 font-mono">
+                                <span id="storage-used-text">0.00 MB</span>
+                                <span>1.00 GB (Limite)</span>
+                            </div>
                         </div>
                     </div>
 
@@ -2100,23 +2128,51 @@
         function updateStorageUI(stats) {
             const limitBytes = 1 * 1024 * 1024 * 1024; // 1 GB
             const usedBytes = stats.total_bytes || 0;
-            const percent = ((usedBytes / limitBytes) * 100).toFixed(4);
+            const percent = ((usedBytes / limitBytes) * 100);
             
-            document.getElementById('storage-percent-text').innerText = `${parseFloat(percent).toFixed(2)}%`;
+            // Proporções em relação ao limite total de 1GB
+            const seriesPctOfLimit = ((stats.series_bytes || 0) / limitBytes) * 100;
+            const moviesPctOfLimit = ((stats.movie_bytes || 0) / limitBytes) * 100;
+            
+            // Garante que a soma não passe de 100%
+            const seriesPct = Math.min(seriesPctOfLimit, 100);
+            const moviesPct = Math.min(moviesPctOfLimit, 100 - seriesPct);
+            const freePct = Math.max(0, 100 - seriesPct - moviesPct);
+            
+            // Monta o gradiente cônico para o gráfico de rosca (donut chart)
+            const endSeries = seriesPct;
+            const endMovies = seriesPct + moviesPct;
+            
+            const chartBg = `conic-gradient(
+                #6366f1 0% ${endSeries.toFixed(4)}%, 
+                #a855f7 ${endSeries.toFixed(4)}% ${endMovies.toFixed(4)}%, 
+                #27272a ${endMovies.toFixed(4)}% 100%
+            )`;
+            
+            document.getElementById('storage-pie-chart').style.background = chartBg;
+            document.getElementById('storage-donut-percent').innerText = `${percent.toFixed(2)}%`;
+            
+            document.getElementById('legend-series-pct').innerText = `${seriesPct.toFixed(2)}%`;
+            document.getElementById('legend-movies-pct').innerText = `${moviesPct.toFixed(2)}%`;
+            document.getElementById('legend-free-pct').innerText = `${freePct.toFixed(2)}%`;
+            
+            document.getElementById('storage-percent-text').innerText = `${percent.toFixed(2)}%`;
             document.getElementById('storage-progress-bar').style.width = `${Math.min(percent, 100)}%`;
             document.getElementById('storage-used-text').innerText = formatBytes(usedBytes);
             
             document.getElementById('storage-series-count').innerText = `${stats.series_count || 0} itens`;
             document.getElementById('storage-series-size').innerText = formatBytes(stats.series_bytes || 0);
             
-            const seriesPercent = usedBytes > 0 ? (((stats.series_bytes || 0) / usedBytes) * 100).toFixed(1) : 0;
-            document.getElementById('storage-series-percent').innerText = `${seriesPercent}% do espaço usado`;
+            const totalDataBytes = (stats.series_bytes || 0) + (stats.movie_bytes || 0);
+            
+            const seriesPercent = totalDataBytes > 0 ? (((stats.series_bytes || 0) / totalDataBytes) * 100).toFixed(1) : 0;
+            document.getElementById('storage-series-percent').innerText = `${seriesPercent}% do espaço de dados`;
             
             document.getElementById('storage-movies-count').innerText = `${stats.movie_count || 0} itens`;
             document.getElementById('storage-movies-size').innerText = formatBytes(stats.movie_bytes || 0);
             
-            const realMoviePercent = usedBytes > 0 ? (((stats.movie_bytes || 0) / usedBytes) * 100).toFixed(1) : 0;
-            document.getElementById('storage-movies-percent').innerText = `${realMoviePercent}% do espaço usado`;
+            const realMoviePercent = totalDataBytes > 0 ? (((stats.movie_bytes || 0) / totalDataBytes) * 100).toFixed(1) : 0;
+            document.getElementById('storage-movies-percent').innerText = `${realMoviePercent}% do espaço de dados`;
             
             // Estimativas
             const remainingBytes = Math.max(0, limitBytes - usedBytes);

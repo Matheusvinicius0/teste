@@ -119,6 +119,37 @@ app.get('/:nome', async (req, res) => {
 });
 
 // ==========================================
+// ROTA 5: Estatísticas de Armazenamento (/api/stats)
+// ==========================================
+app.get('/api/stats', async (req, res) => {
+    try {
+        const query = `
+            SELECT 
+                pg_total_relation_size('arquivos_json') AS total_size,
+                (SELECT COALESCE(SUM(octet_length(conteudo::text)), 0) FROM arquivos_json WHERE conteudo->>'type' = 'movie') AS movie_size,
+                (SELECT COALESCE(SUM(octet_length(conteudo::text)), 0) FROM arquivos_json WHERE conteudo->>'type' = 'series') AS series_size,
+                (SELECT COUNT(*) FROM arquivos_json WHERE conteudo->>'type' = 'movie') AS movie_count,
+                (SELECT COUNT(*) FROM arquivos_json WHERE conteudo->>'type' = 'series') AS series_count,
+                (SELECT COUNT(*) FROM arquivos_json) AS total_count;
+        `;
+        const result = await pool.query(query);
+        const stats = result.rows[0];
+        
+        res.json({
+            total_bytes: parseInt(stats.total_size, 10),
+            movie_bytes: parseInt(stats.movie_size, 10),
+            series_bytes: parseInt(stats.series_size, 10),
+            movie_count: parseInt(stats.movie_count, 10),
+            series_count: parseInt(stats.series_count, 10),
+            total_count: parseInt(stats.total_count, 10)
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ erro: 'Erro ao buscar estatísticas do banco de dados.' });
+    }
+});
+
+// ==========================================
 // INICIALIZAÇÃO DO SERVIDOR
 // ==========================================
 const PORT = process.env.PORT || 3000;
