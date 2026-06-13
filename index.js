@@ -94,6 +94,45 @@ app.get('/api/all', async (req, res) => {
 });
 
 // ==========================================
+// ROTA 2b: Listar todos para o Catálogo (/api/catalog)
+// ==========================================
+app.get('/api/catalog', async (req, res) => {
+    try {
+        const query = 'SELECT conteudo FROM arquivos_json ORDER BY criado_em DESC;';
+        const result = await pool.query(query);
+        res.json(result.rows.map(r => r.conteudo));
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ erro: 'Erro ao carregar o catálogo.' });
+    }
+});
+
+// ==========================================
+// ROTA 2c: Apagar JSON (/api/delete)
+// ==========================================
+app.post('/api/delete', async (req, res) => {
+    const { id, senha } = req.body;
+    const adminPassword = process.env.ADMIN_PASSWORD || "sua_senha_padrao_aqui";
+
+    if (senha !== adminPassword) {
+        return res.status(401).json({ erro: 'Senha incorreta.' });
+    }
+
+    if (!id) {
+        return res.status(400).json({ erro: 'O nome/ID é obrigatório.' });
+    }
+
+    try {
+        const query = 'DELETE FROM arquivos_json WHERE nome_do_json = $1;';
+        await pool.query(query, [id]);
+        res.json({ sucesso: true, mensagem: `Arquivo '${id}' removido com sucesso.` });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ erro: 'Erro ao apagar o arquivo do banco.' });
+    }
+});
+
+// ==========================================
 // ROTA 3: Contar total de JSONs (/count)
 // ==========================================
 app.get('/count', async (req, res) => {
@@ -112,8 +151,21 @@ app.get('/count', async (req, res) => {
 // ROTA 4: Visualizar JSON específico (/:nome)
 // ==========================================
 app.get('/:nome', async (req, res) => {
+    if (req.params.nome === 'favicon.ico') return res.status(204).end();
+    if (['upload', 'api', 'count'].includes(req.params.nome)) {
+        return res.status(404).json({ erro: 'Rota reservada.' });
+    }
     try {
-        const query = 'SELECT conteudo FROM arquivos_json WHERE nome_do_json = $1;';
+        const query = `
+            UPDATE arquivos_json 
+            SET conteudo = jsonb_set(
+                conteudo, 
+                '{views}', 
+                to_jsonb(COALESCE((conteudo->>'views')::int, 0) + 1)
+            ) 
+            WHERE nome_do_json = $1 
+            RETURNING conteudo;
+        `;
         const result = await pool.query(query, [req.params.nome]);
 
         if (result.rows.length === 0) {
@@ -129,13 +181,33 @@ app.get('/:nome', async (req, res) => {
 });
 
 // ==========================================
+// ROTA 4b: Ranking de Acessos (/api/vistos)
+// ==========================================
+app.get('/api/vistos', async (req, res) => {
+    try {
+        const query = `
+            SELECT 
+                nome_do_json AS id, 
+                COALESCE((conteudo->>'views')::int, 0) AS v
+            FROM arquivos_json
+            ORDER BY v DESC;
+        `;
+        const result = await pool.query(query);
+        res.json(result.rows);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ erro: 'Erro ao buscar ranking de acessos.' });
+    }
+});
+
+// ==========================================
 // ROTA 5: Estatísticas de Armazenamento (/api/stats)
 // ==========================================
 app.get('/api/stats', async (req, res) => {
     try {
         const query = `
             SELECT 
-                pg_total_relation_size('arquivos_json') AS total_size,
+                (pg_total_relation_size('arquivos_json') + COALESCE(pg_total_relation_size('pedidos_sugeridos'), 0)) AS total_size,
                 (SELECT COALESCE(SUM(octet_length(conteudo::text)), 0) FROM arquivos_json WHERE conteudo->>'type' = 'movie') AS movie_size,
                 (SELECT COALESCE(SUM(octet_length(conteudo::text)), 0) FROM arquivos_json WHERE conteudo->>'type' = 'series') AS series_size,
                 (SELECT COUNT(*) FROM arquivos_json WHERE conteudo->>'type' = 'movie') AS movie_count,
@@ -267,9 +339,66 @@ app.post('/api/pedidos/delete', async (req, res) => {
 });
 
 // ==========================================
+// TAREFA AGENDADA: Limpeza semanal dos arquivos mais vistos
+// ==========================================
+const verificarELimparMaisVistos = async () => {
+    try {
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS agenda_tarefas (
+                chave VARCHAR(50) PRIMARY KEY,
+                ultimo_executado TIMESTAMP WITH TIME ZONE NOT NULL
+            );
+        `);
+
+        const res = await pool.query("SELECT ultimo_executado FROM agenda_tarefas WHERE chave = 'limpeza_mais_vistos';");
+        
+        const agora = new Date();
+        if (res.rows.length === 0) {
+            await pool.query("INSERT INTO agenda_tarefas (chave, ultimo_executado) VALUES ('limpeza_mais_vistos', $1);", [agora]);
+            await executarLimpezaMaisVistosNode();
+        } else {
+            const ultimoExecutado = new Date(res.rows[0].ultimo_executado);
+            const seteDiasEmMs = 7 * 24 * 60 * 60 * 1000;
+            if (agora - ultimoExecutado >= seteDiasEmMs) {
+                console.log("Executando limpeza semanal dos arquivos mais vistos...");
+                await executarLimpezaMaisVistosNode();
+                await pool.query("UPDATE agenda_tarefas SET ultimo_executado = $1 WHERE chave = 'limpeza_mais_vistos';", [agora]);
+            }
+        }
+    } catch (err) {
+        console.error("Erro ao verificar/executar limpeza semanal:", err);
+    }
+};
+
+const executarLimpezaMaisVistosNode = async () => {
+    try {
+        const deleteQuery = `
+            DELETE FROM arquivos_json 
+            WHERE id IN (
+                SELECT id 
+                FROM arquivos_json 
+                WHERE COALESCE((conteudo->>'views')::int, 0) > 0 
+                ORDER BY COALESCE((conteudo->>'views')::int, 0) DESC 
+                LIMIT 10
+            );
+        `;
+        const res = await pool.query(deleteQuery);
+        console.log(`Limpeza concluída. Total de arquivos removidos: ${res.rowCount}`);
+    } catch (err) {
+        console.error("Erro na query de limpeza:", err);
+    }
+};
+
+// ==========================================
 // INICIALIZAÇÃO DO SERVIDOR
 // ==========================================
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
     console.log(`Servidor rodando na porta ${PORT}`);
+    
+    // Executa verificação inicial de limpeza
+    await verificarELimparMaisVistos();
+    
+    // Agenda para rodar a cada 1 hora
+    setInterval(verificarELimparMaisVistos, 60 * 60 * 1000);
 });

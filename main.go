@@ -177,8 +177,75 @@ func initDB() {
 	fmt.Println("✅ Banco de dados PostgreSQL conectado e tabelas verificadas.")
 }
 
+func verificarELimparMaisVistos() {
+	if db == nil {
+		return
+	}
+
+	// Cria tabela se não existir
+	_, err := db.Exec(`
+		CREATE TABLE IF NOT EXISTS agenda_tarefas (
+			chave VARCHAR(50) PRIMARY KEY,
+			ultimo_executado TIMESTAMP WITH TIME ZONE NOT NULL
+		)
+	`)
+	if err != nil {
+		log.Println("Erro ao criar tabela agenda_tarefas:", err)
+		return
+	}
+
+	var ultimoExecutado time.Time
+	err = db.QueryRow("SELECT ultimo_executado FROM agenda_tarefas WHERE chave = 'limpeza_mais_vistos'").Scan(&ultimoExecutado)
+	
+	agora := time.Now()
+	executar := false
+
+	if err != nil {
+		// Registro não encontrado ou erro, insere
+		_, err = db.Exec("INSERT INTO agenda_tarefas (chave, ultimo_executado) VALUES ('limpeza_mais_vistos', $1)", agora)
+		if err == nil {
+			executar = true
+		}
+	} else {
+		if agora.Sub(ultimoExecutado) >= 7*24*time.Hour {
+			_, err = db.Exec("UPDATE agenda_tarefas SET ultimo_executado = $1 WHERE chave = 'limpeza_mais_vistos'", agora)
+			if err == nil {
+				executar = true
+			}
+		}
+	}
+
+	if executar {
+		log.Println("Executando limpeza semanal dos arquivos mais vistos (Go)...")
+		res, err := db.Exec(`
+			DELETE FROM arquivos_json 
+			WHERE id IN (
+				SELECT id 
+				FROM arquivos_json 
+				WHERE COALESCE((conteudo->>'views')::int, 0) > 0 
+				ORDER BY COALESCE((conteudo->>'views')::int, 0) DESC 
+				LIMIT 10
+			)
+		`)
+		if err != nil {
+			log.Println("Erro ao limpar arquivos mais vistos:", err)
+		} else {
+			rowsAffected, _ := res.RowsAffected()
+			log.Printf("Limpeza concluída. Itens apagados: %d\n", rowsAffected)
+		}
+	}
+}
+
 func main() {
 	initDB()
+
+	// Inicia rotina de limpeza semanal dos arquivos mais vistos
+	go func() {
+		for {
+			verificarELimparMaisVistos()
+			time.Sleep(1 * time.Hour)
+		}
+	}()
 
 	mux := http.NewServeMux()
 
@@ -192,6 +259,7 @@ func main() {
 	mux.HandleFunc("/api/verify", verifyHandler)
 	mux.HandleFunc("/api/pedidos", pedidosHandler)
 	mux.HandleFunc("/api/pedidos/delete", deletePedidoHandler)
+	mux.HandleFunc("/api/vistos", vistosHandler)
 	
 	mux.HandleFunc("/", rootHandler)
 
@@ -449,7 +517,7 @@ func statsHandler(w http.ResponseWriter, r *http.Request) {
 
 	query := `
 		SELECT 
-			pg_total_relation_size('arquivos_json') AS total_size,
+			(pg_total_relation_size('arquivos_json') + COALESCE(pg_total_relation_size('pedidos_sugeridos'), 0)) AS total_size,
 			(SELECT COALESCE(SUM(octet_length(conteudo::text)), 0) FROM arquivos_json WHERE conteudo->>'type' = 'movie') AS movie_size,
 			(SELECT COALESCE(SUM(octet_length(conteudo::text)), 0) FROM arquivos_json WHERE conteudo->>'type' = 'series') AS series_size,
 			(SELECT COUNT(*) FROM arquivos_json WHERE conteudo->>'type' = 'movie') AS movie_count,
@@ -493,9 +561,23 @@ func rootHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	
 	nome := strings.TrimPrefix(path, "/")
+	if nome == "favicon.ico" {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
 	
 	var conteudo string
-	err := db.QueryRow("SELECT conteudo FROM arquivos_json WHERE nome = $1", nome).Scan(&conteudo)
+	err := db.QueryRow(`
+		UPDATE arquivos_json 
+		SET conteudo = jsonb_set(
+			conteudo, 
+			'{views}', 
+			to_jsonb(COALESCE((conteudo->>'views')::int, 0) + 1)
+		) 
+		WHERE nome = $1 
+		RETURNING conteudo
+	`, nome).Scan(&conteudo)
+	
 	if err != nil {
 		if err == sql.ErrNoRows {
 			w.WriteHeader(http.StatusNotFound)
@@ -508,6 +590,43 @@ func rootHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Write([]byte(conteudo))
+}
+
+// Rota para obter o ranking de visualizações
+func vistosHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	if db == nil {
+		http.Error(w, `{"erro": "Banco offline"}`, http.StatusInternalServerError)
+		return
+	}
+
+	rows, err := db.Query(`
+		SELECT 
+			nome AS id, 
+			COALESCE((conteudo->>'views')::int, 0) AS v
+		FROM arquivos_json
+		ORDER BY v DESC
+	`)
+	if err != nil {
+		http.Error(w, `{"erro": "Erro ao buscar ranking"}`, http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	w.Write([]byte("["))
+	first := true
+	for rows.Next() {
+		var id string
+		var v int
+		if err := rows.Scan(&id, &v); err == nil {
+			if !first {
+				w.Write([]byte(","))
+			}
+			w.Write([]byte(fmt.Sprintf(`{"id":"%s","v":%d}`, id, v)))
+			first = false
+		}
+	}
+	w.Write([]byte("]"))
 }
 
 // 6. Rota de Teste de Conexão

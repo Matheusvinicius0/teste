@@ -104,6 +104,9 @@
                 <button onclick="switchView('storage'); loadStorageStats();" id="btn-storage" class="nav-btn px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 hover:bg-zinc-900">
                     <i class="fa-solid fa-database"></i> <span class="hidden sm:inline">Armazenamento</span>
                 </button>
+                <button onclick="toggleAdminLogin()" id="btn-login-admin" class="nav-btn px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 hover:bg-zinc-900">
+                    <i class="fa-solid fa-user-shield"></i> <span>Login Admin</span>
+                </button>
             </div>
         </div>
     </nav>
@@ -311,6 +314,7 @@
                         <select onchange="cat.sort(this.value)" class="w-full bg-zinc-900 text-zinc-200 text-sm rounded-xl px-4 py-2.5 border border-zinc-800 focus:border-zinc-600 focus:outline-none appearance-none cursor-pointer">
                             <option value="newest">Mais Recentes</option>
                             <option value="oldest">Mais Antigos</option>
+                            <option value="views">Mais Vistos</option>
                             <option value="year">Ano de Lançamento</option>
                             <option value="name">Ordem Alfabética</option>
                         </select>
@@ -663,10 +667,109 @@
             }
         }
 
+        let isAdmin = false;
+
+        function updateAdminUI() {
+            const isLogged = sessionStorage.getItem('fenixflix_senha') !== null;
+            isAdmin = isLogged;
+            
+            // 1. Ocultar/Exibir botões de navegação
+            const btnGenerator = document.getElementById('btn-generator');
+            const btnStorage = document.getElementById('btn-storage');
+            
+            if (btnGenerator) {
+                if (isLogged) {
+                    btnGenerator.classList.remove('hidden');
+                } else {
+                    btnGenerator.classList.add('hidden');
+                }
+            }
+            if (btnStorage) {
+                if (isLogged) {
+                    btnStorage.classList.remove('hidden');
+                } else {
+                    btnStorage.classList.add('hidden');
+                }
+            }
+            
+            // Se não estiver logado e estiver na aba de gerador ou armazenamento, volta para o catálogo
+            const activeTab = document.querySelector('.tab-content.active');
+            if (!isLogged && activeTab && (activeTab.id === 'view-generator' || activeTab.id === 'view-storage')) {
+                switchView('catalog');
+                setTimeout(() => cat.filter('all'), 50);
+            }
+            
+            // 2. Ocultar/Exibir botão de edição no modal do catálogo
+            const btnModalEdit = document.getElementById('btnModalEdit');
+            if (btnModalEdit) {
+                if (isLogged) {
+                    btnModalEdit.classList.remove('hidden');
+                } else {
+                    btnModalEdit.classList.add('hidden');
+                }
+            }
+            
+            // 3. Atualizar botão de Login Admin
+            const btnLoginAdmin = document.getElementById('btn-login-admin');
+            if (btnLoginAdmin) {
+                if (isLogged) {
+                    btnLoginAdmin.innerHTML = '<i class="fa-solid fa-right-from-bracket"></i> <span>Sair Admin</span>';
+                    btnLoginAdmin.classList.add('border-red-500/30', 'text-red-400');
+                } else {
+                    btnLoginAdmin.innerHTML = '<i class="fa-solid fa-user-shield"></i> <span>Login Admin</span>';
+                    btnLoginAdmin.classList.remove('border-red-500/30', 'text-red-400');
+                }
+            }
+            
+            // 4. Forçar renderização de listas para atualizar botões internos de editar/apagar
+            if (typeof cat !== 'undefined' && typeof cat.renderFiltered === 'function') {
+                cat.renderFiltered();
+            }
+            if (typeof reqProcessor !== 'undefined' && typeof reqProcessor.renderList === 'function') {
+                reqProcessor.renderList();
+            }
+        }
+
+        async function checkAdminSession() {
+            const cachedSenha = sessionStorage.getItem('fenixflix_senha');
+            if (cachedSenha) {
+                try {
+                    const response = await fetch('/api/verify', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ senha: cachedSenha })
+                    });
+                    if (!response.ok) {
+                        sessionStorage.removeItem('fenixflix_senha');
+                    }
+                } catch (e) {
+                    console.error("Erro ao verificar sessão no carregamento:", e);
+                    sessionStorage.removeItem('fenixflix_senha');
+                }
+            }
+            updateAdminUI();
+        }
+
+        async function toggleAdminLogin() {
+            const isLogged = sessionStorage.getItem('fenixflix_senha') !== null;
+            if (isLogged) {
+                sessionStorage.removeItem('fenixflix_senha');
+                showToast("Sessão Admin encerrada com sucesso.", "success");
+                updateAdminUI();
+            } else {
+                const senha = await getValidPassword("Digite a senha do sistema para acessar como Admin:");
+                if (senha) {
+                    showToast("Autenticado como Admin com sucesso!", "success");
+                    updateAdminUI();
+                }
+            }
+        }
+
         function switchView(viewName) {
             document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
             
             document.querySelectorAll('.nav-btn').forEach(btn => {
+                if (btn.id === 'btn-login-admin') return;
                 btn.classList.remove('active', 'bg-white', 'text-zinc-900', 'border-white');
                 btn.classList.add('bg-transparent', 'text-zinc-400', 'border-zinc-800');
             });
@@ -1555,6 +1658,7 @@
                 cat.currentSort = mode;
                 if (mode === 'newest') cat.filteredItems.sort((a, b) => a.recentOrder - b.recentOrder);
                 else if (mode === 'oldest') cat.filteredItems.sort((a, b) => b.recentOrder - a.recentOrder);
+                else if (mode === 'views') cat.filteredItems.sort((a, b) => (b.views || 0) - (a.views || 0));
                 else if (mode === 'year') cat.filteredItems.sort((a, b) => { const yA = parseInt(a.year) || 0; const yB = parseInt(b.year) || 0; return yB - yA; });
                 else if (mode === 'name') cat.filteredItems.sort((a, b) => (a.title||a.id).localeCompare(b.title||b.id));
                 cat.renderFiltered();
@@ -1687,13 +1791,19 @@
                     footerHtml = `<div class="mt-auto pt-2.5 flex justify-between items-center"><span class="text-[10px] text-zinc-500 font-mono">${item.year || ''}</span><span class="${hasLink ? 'text-zinc-300' : 'text-red-400'} text-[10px] font-medium flex items-center gap-1.5">${hasLink ? streamCount + ' opções' : 'Sem links'}</span></div>`;
                 }
 
+                const isLogged = sessionStorage.getItem('fenixflix_senha') !== null;
+                const adminButtons = isLogged ? `
+                    <button onclick="event.stopPropagation(); cat.editInGenerator('${item.id}')" class="bg-zinc-900/90 text-zinc-300 hover:text-white p-2 rounded-lg backdrop-blur-md border border-zinc-700/50 transition"><i class="fa-solid fa-pen text-[10px]"></i></button>
+                    <button onclick="event.stopPropagation(); cat.deleteItem('${item.id}')" class="bg-zinc-900/90 text-red-400 hover:text-red-300 p-2 rounded-lg backdrop-blur-md border border-zinc-700/50 transition"><i class="fa-solid fa-trash text-[10px]"></i></button>
+                ` : '';
+
                 return `
                 <div class="group bg-zinc-900 rounded-2xl overflow-hidden border border-zinc-800 hover:border-zinc-700 transition-all flex flex-col h-full cursor-pointer relative">
                     <div class="absolute top-2 left-2 flex flex-col gap-1.5 z-30 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onclick="event.stopPropagation(); cat.editInGenerator('${item.id}')" class="bg-zinc-900/90 text-zinc-300 hover:text-white p-2 rounded-lg backdrop-blur-md border border-zinc-700/50 transition"><i class="fa-solid fa-pen text-[10px]"></i></button>
+                        ${adminButtons}
                         <button onclick="event.stopPropagation(); cat.downloadJson('${item.id}')" class="bg-zinc-900/90 text-zinc-300 hover:text-white p-2 rounded-lg backdrop-blur-md border border-zinc-700/50 transition"><i class="fa-solid fa-download text-[10px]"></i></button>
-                        <button onclick="event.stopPropagation(); cat.deleteItem('${item.id}')" class="bg-zinc-900/90 text-red-400 hover:text-red-300 p-2 rounded-lg backdrop-blur-md border border-zinc-700/50 transition"><i class="fa-solid fa-trash text-[10px]"></i></button>
                     </div>
+                    ${item.views ? `<span class="absolute top-2 right-2 bg-zinc-950/80 border border-zinc-800 text-[10px] text-zinc-300 font-mono px-2 py-0.5 rounded-lg backdrop-blur-md z-30 flex items-center gap-1"><i class="fa-solid fa-eye text-[9px]"></i>${item.views}</span>` : ''}
                     <div class="aspect-[2/3] bg-zinc-950 relative overflow-hidden" onclick="cat.openLinks('${item.id}')">
                         ${posterHtml}
                     </div>
@@ -1982,18 +2092,23 @@
 
             fetchTitlesFromTMDB: async () => {
                 const statusEl = document.getElementById('req-loading-status');
-                const itemsToFetch = Array.from(reqProcessor.parsedItems.values()).filter(i => i.title === "Buscando..." || i.title === "Erro");
+                const itemsToFetch = Array.from(reqProcessor.parsedItems.values()).filter(i => i.title === "Buscando...");
                 const total = itemsToFetch.length;
                 
-                if (total === 0) return;
+                if (total === 0) {
+                    if (statusEl) statusEl.innerText = `Concluído`;
+                    return;
+                }
 
                 let count = 0;
                 for (const item of itemsToFetch) {
                     const pct = Math.round((count / total) * 100);
-                    statusEl.innerHTML = `<span class="loader inline-block w-3 h-3 mr-2 border-zinc-500 border-t-zinc-300"></span> TMDB: ${pct}%`;
+                    if (statusEl) statusEl.innerHTML = `<span class="loader inline-block w-3 h-3 mr-2 border-zinc-500 border-t-zinc-300"></span> TMDB: ${pct}%`;
 
                     try {
-                        const res = await fetch(`https://api.themoviedb.org/3/find/${item.id}?api_key=${reqProcessor.tmdbKey}&external_source=imdb_id&language=pt-BR`);
+                        const res = await fetch(`https://api.themoviedb.org/3/find/${item.id}?external_source=imdb_id&language=pt-BR`, {
+                            headers: { "Authorization": `Bearer ${reqProcessor.tmdbKey}` }
+                        });
                         if(res.ok) {
                             const data = await res.json();
                             if (item.type === 'movie' && data.movie_results.length > 0) {
@@ -2003,14 +2118,16 @@
                             } else {
                                 item.title = "Título desconhecido";
                             }
+                        } else {
+                            item.title = "Não encontrado";
                         }
                     } catch(e) {
-                        item.title = "Erro";
+                        item.title = "Erro ao carregar";
                     }
                     count++;
                 }
                 
-                statusEl.innerText = `100% Concluído`;
+                if (statusEl) statusEl.innerText = `100% Concluído`;
                 document.getElementById('btn-download-json').classList.remove('hidden');
                 document.getElementById('btn-download-txt').classList.remove('hidden');
                 document.getElementById('btn-download-csv')?.classList.remove('hidden');
@@ -2070,6 +2187,9 @@
                         epsHtml = `<div class="mt-3 flex flex-wrap gap-1.5">${epTags}</div>`;
                     }
 
+                    const isLogged = sessionStorage.getItem('fenixflix_senha') !== null;
+                    const removeBtnHtml = isLogged ? `<button onclick="reqProcessor.removeItem('${item.id}')" class="text-zinc-700 hover:text-red-400 transition p-2"><i class="fa-solid fa-xmark"></i></button>` : '';
+
                     html += `
                         <div class="bg-zinc-950 p-4 rounded-xl border border-zinc-900 flex flex-col group">
                             <div class="flex items-center justify-between">
@@ -2083,7 +2203,7 @@
                                         ${countBadge}
                                     </div>
                                 </div>
-                                <button onclick="reqProcessor.removeItem('${item.id}')" class="text-zinc-700 hover:text-red-400 transition p-2"><i class="fa-solid fa-xmark"></i></button>
+                                ${removeBtnHtml}
                             </div>
                             ${epsHtml}
                         </div>
@@ -2345,25 +2465,29 @@
 
         // Start by loading the catalog automatically on page load
         document.addEventListener('DOMContentLoaded', async () => {
+            await checkAdminSession();
             await cat.init();
             
-            // Verifica o parâmetro "pedido" ou "pedio" na URL
-            const params = new URLSearchParams(window.location.search);
-            const pedido = params.get('pedido') || params.get('pedio');
-            if (pedido) {
-                const id = pedido.trim();
-                const input = document.getElementById('contentId');
-                if (input) {
-                    input.value = id;
-                    switchView('generator');
-                    
-                    // Se já existir no catálogo, carrega para editar
-                    const existingItem = cat.allItems.find(i => i.id === id);
-                    if (existingItem) {
-                        cat.editInGenerator(id);
-                    } else {
-                        // Caso contrário, faz a busca inteligente
-                        gen.smartSearch();
+            const isLogged = sessionStorage.getItem('fenixflix_senha') !== null;
+            if (isLogged) {
+                // Verifica o parâmetro "pedido" ou "pedio" na URL
+                const params = new URLSearchParams(window.location.search);
+                const pedido = params.get('pedido') || params.get('pedio');
+                if (pedido) {
+                    const id = pedido.trim();
+                    const input = document.getElementById('contentId');
+                    if (input) {
+                        input.value = id;
+                        switchView('generator');
+                        
+                        // Se já existir no catálogo, carrega para editar
+                        const existingItem = cat.allItems.find(i => i.id === id);
+                        if (existingItem) {
+                            cat.editInGenerator(id);
+                        } else {
+                            // Caso contrário, faz a busca inteligente
+                            gen.smartSearch();
+                        }
                     }
                 }
             }
