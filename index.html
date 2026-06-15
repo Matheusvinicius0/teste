@@ -603,6 +603,53 @@
     <!-- Container de Toasts (Notificações) -->
     <div id="toast-container" class="fixed bottom-6 left-1/2 -translate-x-1/2 md:translate-x-0 md:left-auto md:right-6 z-[200] flex flex-col gap-2 pointer-events-none w-[90%] md:w-auto"></div>
 
+    <!-- Modal de Login Personalizado -->
+    <div id="custom-login-modal" class="fixed inset-0 z-[250] hidden flex items-center justify-center p-4">
+        <!-- Backdrop com transição de opacidade -->
+        <div id="login-modal-backdrop" class="absolute inset-0 bg-black/75 backdrop-blur-md transition-opacity duration-300 opacity-0"></div>
+        
+        <!-- Conteúdo do Modal com animação de escala e opacidade -->
+        <div id="login-modal-content" class="relative bg-zinc-900/90 border border-zinc-800/80 rounded-2xl w-full max-w-md p-6 md:p-8 shadow-2xl shadow-indigo-500/5 transition-all duration-300 transform scale-95 opacity-0">
+            
+            <!-- Efeito de Brilho de Fundo -->
+            <div class="absolute -top-10 -left-10 w-40 h-40 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none"></div>
+            <div class="absolute -bottom-10 -right-10 w-40 h-40 bg-purple-500/10 rounded-full blur-3xl pointer-events-none"></div>
+
+            <!-- Cabeçalho do Modal -->
+            <div class="flex flex-col items-center text-center mb-6 relative">
+                <div class="w-14 h-14 rounded-2xl bg-gradient-to-tr from-indigo-500/20 to-purple-500/20 border border-indigo-500/30 flex items-center justify-center mb-4 shadow-inner">
+                    <i class="fa-solid fa-user-shield text-indigo-400 text-xl"></i>
+                </div>
+                <h3 class="text-lg font-bold text-white tracking-tight">Autenticação Requerida</h3>
+                <p id="login-modal-message" class="text-xs text-zinc-400 mt-2 px-2 leading-relaxed">Digite a senha do sistema para continuar.</p>
+            </div>
+            
+            <!-- Formulário -->
+            <form id="login-modal-form" onsubmit="event.preventDefault();" class="space-y-5 relative">
+                <div>
+                    <label for="login-modal-password" class="block text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-2">Senha do Sistema</label>
+                    <div class="relative">
+                        <i class="fa-solid fa-lock absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500 text-xs"></i>
+                        <input type="password" id="login-modal-password" placeholder="Digite a senha..." autocomplete="current-password" class="w-full bg-zinc-950 text-white text-sm rounded-xl pl-10 pr-12 py-3 border border-zinc-800 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none transition-all placeholder-zinc-700">
+                        <button type="button" id="login-modal-toggle-visibility" class="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 transition-colors">
+                            <i class="fa-solid fa-eye text-xs"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="flex gap-3 pt-2">
+                    <button type="button" id="login-modal-cancel" class="flex-1 bg-zinc-950 hover:bg-zinc-800 text-zinc-400 border border-zinc-800 hover:border-zinc-700 py-3 rounded-xl text-xs font-semibold transition-all">
+                        Cancelar
+                    </button>
+                    <button type="submit" id="login-modal-submit" class="flex-1 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white py-3 rounded-xl text-xs font-semibold transition-all shadow-lg shadow-indigo-600/20 flex items-center justify-center gap-2">
+                        <span>Confirmar</span>
+                        <i class="fa-solid fa-chevron-right text-[10px]"></i>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <script>
         // --- UTILIDADES ---
         function showToast(message, type = 'success') {
@@ -626,6 +673,95 @@
 
         const escapeHTML = str => (str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/\n/g, '&#10;');
 
+        function showCustomLoginModal(promptMessage) {
+            return new Promise((resolve) => {
+                const modal = document.getElementById('custom-login-modal');
+                const backdrop = document.getElementById('login-modal-backdrop');
+                const content = document.getElementById('login-modal-content');
+                const form = document.getElementById('login-modal-form');
+                const input = document.getElementById('login-modal-password');
+                const cancelBtn = document.getElementById('login-modal-cancel');
+                const messageEl = document.getElementById('login-modal-message');
+                const toggleVisibilityBtn = document.getElementById('login-modal-toggle-visibility');
+                const toggleIcon = toggleVisibilityBtn.querySelector('i');
+
+                // Reset modal state
+                input.value = '';
+                input.type = 'password';
+                toggleIcon.className = 'fa-solid fa-eye text-xs';
+                
+                if (promptMessage) {
+                    messageEl.textContent = promptMessage;
+                } else {
+                    messageEl.textContent = "Digite a senha do sistema para continuar.";
+                }
+
+                // Show modal display
+                modal.classList.remove('hidden');
+
+                // Animate in
+                setTimeout(() => {
+                    backdrop.classList.remove('opacity-0');
+                    backdrop.classList.add('opacity-100');
+                    content.classList.remove('scale-95', 'opacity-0');
+                    content.classList.add('scale-100', 'opacity-100');
+                    input.focus();
+                }, 10);
+
+                // Helper to close modal and resolve
+                function closeModal(value) {
+                    backdrop.classList.remove('opacity-100');
+                    backdrop.classList.add('opacity-0');
+                    content.classList.remove('scale-100', 'opacity-100');
+                    content.classList.add('scale-95', 'opacity-0');
+
+                    // Cleanup listeners
+                    form.removeEventListener('submit', handleSubmit);
+                    cancelBtn.removeEventListener('click', handleCancel);
+                    backdrop.removeEventListener('click', handleCancel);
+                    document.removeEventListener('keydown', handleKeyDown);
+                    toggleVisibilityBtn.removeEventListener('click', handleToggleVisibility);
+
+                    setTimeout(() => {
+                        modal.classList.add('hidden');
+                        resolve(value);
+                    }, 300);
+                }
+
+                function handleSubmit(e) {
+                    e.preventDefault();
+                    closeModal(input.value);
+                }
+
+                function handleCancel() {
+                    closeModal(null);
+                }
+
+                function handleKeyDown(e) {
+                    if (e.key === 'Escape') {
+                        handleCancel();
+                    }
+                }
+
+                function handleToggleVisibility() {
+                    if (input.type === 'password') {
+                        input.type = 'text';
+                        toggleIcon.className = 'fa-solid fa-eye-slash text-xs';
+                    } else {
+                        input.type = 'password';
+                        toggleIcon.className = 'fa-solid fa-eye text-xs';
+                    }
+                }
+
+                // Bind event listeners
+                form.addEventListener('submit', handleSubmit);
+                cancelBtn.addEventListener('click', handleCancel);
+                backdrop.addEventListener('click', handleCancel);
+                document.addEventListener('keydown', handleKeyDown);
+                toggleVisibilityBtn.addEventListener('click', handleToggleVisibility);
+            });
+        }
+
         async function getValidPassword(promptMessage) {
             const cachedSenha = sessionStorage.getItem('fenixflix_senha');
             if (cachedSenha) {
@@ -643,7 +779,7 @@
                 }
             }
             
-            const senha = prompt(promptMessage || "Digite a senha do sistema:");
+            const senha = await showCustomLoginModal(promptMessage);
             if (!senha) return null;
             
             try {
