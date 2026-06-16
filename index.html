@@ -104,6 +104,9 @@
                 <button onclick="switchView('storage'); loadStorageStats();" id="btn-storage" class="nav-btn px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 hover:bg-zinc-900">
                     <i class="fa-solid fa-database"></i> <span class="hidden sm:inline">Armazenamento</span>
                 </button>
+                <a href="https://fenixflix-ur9u.onrender.com/" target="_blank" class="px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 bg-purple-600 hover:bg-purple-500 text-white">
+                    <i class="fa-solid fa-puzzle-piece"></i> <span>Addon</span>
+                </a>
                 <button onclick="toggleAdminLogin()" id="btn-login-admin" class="nav-btn px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 hover:bg-zinc-900">
                     <i class="fa-solid fa-user-shield"></i> <span>Login Admin</span>
                 </button>
@@ -2010,15 +2013,11 @@
                 else el.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Conectado`;
             },
 
-            uploadEmMassa: async (input) => {
-                const files = input.files;
+            processFiles: async (files) => {
                 if (!files || files.length === 0) return;
 
                 const senha = await getValidPassword(`Vai enviar ${files.length} ficheiro(s) JSON. Digite a senha do sistema:`);
-                if (!senha) {
-                    input.value = ""; 
-                    return;
-                }
+                if (!senha) return;
 
                 let sucesso = 0;
                 let erro = 0;
@@ -2054,10 +2053,15 @@
                     }
                 }
 
-                input.value = ""; 
                 showToast(`Upload concluído! Sucesso: ${sucesso} | Erros: ${erro}`, erro > 0 ? 'warning' : 'success');
-                
                 cat.init();
+            },
+
+            uploadEmMassa: async (input) => {
+                const files = input.files;
+                if (!files || files.length === 0) return;
+                await cat.processFiles(files);
+                input.value = ""; 
             },
 
             openLinks: (id) => {
@@ -2226,34 +2230,65 @@
                 input.value = "";
             },
 
+            getCache: () => {
+                try {
+                    const cache = localStorage.getItem('fenixflix_tmdb_cache');
+                    return cache ? JSON.parse(cache) : {};
+                } catch(e) {
+                    return {};
+                }
+            },
+
+            setCache: (cache) => {
+                try {
+                    localStorage.setItem('fenixflix_tmdb_cache', JSON.stringify(cache));
+                } catch(e) {}
+            },
+
             fetchTitlesFromTMDB: async () => {
                 const statusEl = document.getElementById('req-loading-status');
+                const cache = reqProcessor.getCache();
+                
+                // 1. Resolve imediatamente o que já estiver em cache local
+                reqProcessor.parsedItems.forEach(item => {
+                    if (item.title === "Buscando..." && cache[item.id]) {
+                        item.title = cache[item.id];
+                    }
+                });
+                
+                reqProcessor.renderList();
+
+                // 2. Filtra o que realmente precisa ser buscado na API
                 const itemsToFetch = Array.from(reqProcessor.parsedItems.values()).filter(i => i.title === "Buscando...");
                 const total = itemsToFetch.length;
                 
                 if (total === 0) {
                     if (statusEl) statusEl.innerText = `Concluído`;
+                    document.getElementById('btn-download-json').classList.remove('hidden');
+                    document.getElementById('btn-download-txt').classList.remove('hidden');
+                    document.getElementById('btn-download-csv')?.classList.remove('hidden');
                     return;
                 }
 
+                // 3. Busca o restante em lotes paralelos (lote de 10 por vez)
+                const batchSize = 10;
                 let count = 0;
-                for (const item of itemsToFetch) {
-                    const pct = Math.round((count / total) * 100);
-                    if (statusEl) statusEl.innerHTML = `<span class="loader inline-block w-3 h-3 mr-2 border-zinc-500 border-t-zinc-300"></span> TMDB: ${pct}%`;
-
+                
+                const fetchItem = async (item) => {
                     try {
                         const res = await fetch(`https://api.themoviedb.org/3/find/${item.id}?external_source=imdb_id&language=pt-BR`, {
                             headers: { "Authorization": `Bearer ${reqProcessor.tmdbKey}` }
                         });
                         if(res.ok) {
                             const data = await res.json();
+                            let title = "Título desconhecido";
                             if (item.type === 'movie' && data.movie_results.length > 0) {
-                                item.title = data.movie_results[0].title;
+                                title = data.movie_results[0].title;
                             } else if (item.type === 'series' && data.tv_results.length > 0) {
-                                item.title = data.tv_results[0].name;
-                            } else {
-                                item.title = "Título desconhecido";
+                                title = data.tv_results[0].name;
                             }
+                            item.title = title;
+                            cache[item.id] = title;
                         } else {
                             item.title = "Não encontrado";
                         }
@@ -2261,13 +2296,22 @@
                         item.title = "Erro ao carregar";
                     }
                     count++;
+                    const pct = Math.round((count / total) * 100);
+                    if (statusEl) statusEl.innerHTML = `<span class="loader inline-block w-3 h-3 mr-2 border-zinc-500 border-t-zinc-300"></span> TMDB: ${pct}%`;
+                };
+
+                // Executa em lotes paralelos de 10 requisições simultâneas
+                for (let i = 0; i < itemsToFetch.length; i += batchSize) {
+                    const batch = itemsToFetch.slice(i, i + batchSize);
+                    await Promise.all(batch.map(item => fetchItem(item)));
+                    reqProcessor.setCache(cache); // Grava o progresso do cache
+                    reqProcessor.renderList();
                 }
                 
                 if (statusEl) statusEl.innerText = `100% Concluído`;
                 document.getElementById('btn-download-json').classList.remove('hidden');
                 document.getElementById('btn-download-txt').classList.remove('hidden');
                 document.getElementById('btn-download-csv')?.classList.remove('hidden');
-                reqProcessor.renderList(); 
             },
 
             updateUI: () => {
@@ -2629,6 +2673,55 @@
             }
         });
 
+        // ==========================================
+        // DRAG AND DROP OVERLAY & LISTENERS
+        // ==========================================
+        const overlay = document.getElementById('drag-drop-overlay');
+        
+        window.addEventListener('dragenter', (e) => {
+            e.preventDefault();
+            if (overlay) {
+                overlay.classList.remove('opacity-0', 'pointer-events-none');
+                overlay.classList.add('opacity-100');
+            }
+        });
+
+        if (overlay) {
+            overlay.addEventListener('dragover', (e) => {
+                e.preventDefault();
+            });
+
+            overlay.addEventListener('dragleave', (e) => {
+                e.preventDefault();
+                overlay.classList.remove('opacity-100');
+                overlay.classList.add('opacity-0', 'pointer-events-none');
+            });
+
+            overlay.addEventListener('drop', async (e) => {
+                e.preventDefault();
+                overlay.classList.remove('opacity-100');
+                overlay.classList.add('opacity-0', 'pointer-events-none');
+                
+                const files = Array.from(e.dataTransfer.files).filter(f => f.name.endsWith('.json'));
+                if (files.length > 0) {
+                    await cat.processFiles(files);
+                } else {
+                    showToast("Por favor, solte apenas arquivos .json!", "error");
+                }
+            });
+        }
     </script>
+
+    <!-- Overlay para arrastar e soltar arquivos -->
+    <div id="drag-drop-overlay" class="fixed inset-0 bg-indigo-950/80 backdrop-blur-md z-[9999] flex flex-col items-center justify-center border-4 border-dashed border-indigo-500 m-4 rounded-3xl opacity-0 pointer-events-none transition-opacity duration-300">
+        <div class="bg-zinc-950/90 border border-zinc-800 p-8 rounded-2xl flex flex-col items-center text-center max-w-sm shadow-2xl">
+            <div class="w-16 h-16 bg-indigo-600/20 text-indigo-400 rounded-full flex items-center justify-center text-3xl mb-4 animate-bounce">
+                <i class="fa-solid fa-cloud-arrow-up"></i>
+            </div>
+            <h3 class="text-white font-bold text-lg mb-2">Upload em Lote</h3>
+            <p class="text-zinc-400 text-sm mb-6">Solte seus arquivos JSON em qualquer lugar da página para importar para o banco de dados.</p>
+            <span class="text-indigo-400 text-xs font-semibold uppercase tracking-wider bg-indigo-500/10 px-3 py-1 rounded-full border border-indigo-500/20">Somente arquivos .json</span>
+        </div>
+    </div>
 </body>
 </html>

@@ -1,9 +1,12 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
+const multer = require('multer');
 const { Pool } = require('pg');
 
 const app = express();
+const upload = multer();
 
 // Otimização: Limita o tamanho do JSON para 2MB para não estourar a RAM no plano gratuito
 app.use(express.json({ limit: '2mb' })); 
@@ -46,9 +49,76 @@ const initDB = async () => {
 initDB();
 
 // ==========================================
+// ROTA 0: Servir o Frontend (index.html)
+// ==========================================
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'));
+});
+
+// ==========================================
+// CONFIGURAÇÕES TMDB E RPDB
+// ==========================================
+const TMDB_API_KEY = "eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJlZTBmMzJmNzY5Mzc0YTkzYTI0ZmNiYzcyMWRlODYzNCIsIm5iZiI6MTc1NjA2MzM2NC4yMzksInN1YiI6IjY4YWI2Njg0ZDAyMjdhYTVlMjlkYjE2MSIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.z1hG61Z5RCvn6qEZj60sHxrDZ0hR8QQi4rt18erzF-w";
+const RPDB_BASE_URL = "https://api.ratingposterdb.com/t0-free-rpdb";
+
+async function getTMDBInfo(id) {
+    try {
+        const url = `https://api.themoviedb.org/3/find/${id}?external_source=imdb_id&language=pt-BR`;
+        const res = await fetch(url, {
+            headers: {
+                "User-Agent": "Mozilla/5.0",
+                "Accept": "application/json",
+                "Authorization": `Bearer ${TMDB_API_KEY}`
+            }
+        });
+        if (!res.ok) {
+            console.warn(`⚠️ TMDB recusou o pedido para o ID ${id}. Status: ${res.status}`);
+            return null;
+        }
+        const data = await res.json();
+        
+        if (data.movie_results && data.movie_results.length > 0) {
+            const movie = data.movie_results[0];
+            return {
+                title: movie.title,
+                year: movie.release_date ? movie.release_date.substring(0, 4) : "",
+                type: "movie"
+            };
+        } else if (data.tv_results && data.tv_results.length > 0) {
+            const show = data.tv_results[0];
+            return {
+                title: show.name,
+                year: show.first_air_date ? show.first_air_date.substring(0, 4) : "",
+                type: "series"
+            };
+        }
+    } catch (err) {
+        console.error(`❌ Erro ao buscar dados no TMDB para o ID ${id}:`, err.message);
+    }
+    return null;
+}
+
+async function getCinemetaInfo(id, type) {
+    try {
+        const url = `https://v3-cinemeta.strem.io/meta/${type}/${id}.json`;
+        const res = await fetch(url, {
+            headers: {
+                "User-Agent": "Mozilla/5.0"
+            }
+        });
+        if (!res.ok) return null;
+        const data = await res.json();
+        return data.meta || null;
+    } catch (err) {
+        console.error(`❌ Erro ao buscar no Cinemeta para o ID ${id}:`, err.message);
+    }
+    return null;
+}
+
+// ==========================================
 // ROTA 1: Enviar JSON (Protegida por senha)
 // ==========================================
-app.post('/upload', async (req, res) => {
+app.post('/upload', upload.none(), async (req, res) => {
     const { senha, nome, conteudo } = req.body;
 
     // Validação da senha
@@ -60,6 +130,56 @@ app.post('/upload', async (req, res) => {
         return res.status(400).json({ erro: 'O nome e o conteúdo do JSON são obrigatórios.' });
     }
 
+    let parsedConteudo = conteudo;
+    if (typeof conteudo === 'string') {
+        try {
+            parsedConteudo = JSON.parse(conteudo);
+        } catch (e) {
+            return res.status(400).json({ erro: 'O conteúdo enviado não é um JSON válido.' });
+        }
+    }
+
+    // ==========================================
+    // ENRIQUECIMENTO TMDB/CINEMETA/RPDB
+    // ==========================================
+    try {
+        let imdbID = "";
+        if (typeof parsedConteudo.id === 'string' && parsedConteudo.id.startsWith('tt')) {
+            imdbID = parsedConteudo.id;
+        } else if (nome && nome.startsWith('tt')) {
+            imdbID = nome;
+        }
+
+        if (imdbID) {
+            const tmdbData = await getTMDBInfo(imdbID);
+            if (tmdbData) {
+                parsedConteudo.title = tmdbData.title;
+                if (!parsedConteudo.type) {
+                    parsedConteudo.type = tmdbData.type;
+                }
+            }
+
+            const cType = parsedConteudo.type || "movie";
+            const cinemetaData = await getCinemetaInfo(imdbID, cType);
+            if (cinemetaData) {
+                if (cinemetaData.videos) {
+                    parsedConteudo.cinemetaVideos = cinemetaData.videos;
+                }
+            }
+
+            if (!parsedConteudo.poster) {
+                parsedConteudo.poster = `${RPDB_BASE_URL}/imdb/poster-default/${imdbID}.jpg`;
+            }
+
+            if (!parsedConteudo.id) {
+                parsedConteudo.id = imdbID;
+            }
+        }
+    } catch (enrichErr) {
+        console.error("⚠️ Falha ao enriquecer metadados do JSON:", enrichErr.message);
+    }
+    // ==========================================
+
     try {
         // Usa ON CONFLICT para atualizar o JSON se o nome já existir (comportamento de UPSERT)
         const query = `
@@ -69,7 +189,7 @@ app.post('/upload', async (req, res) => {
             DO UPDATE SET conteudo = EXCLUDED.conteudo, criado_em = CURRENT_TIMESTAMP
             RETURNING *;
         `;
-        const values = [nome, JSON.stringify(conteudo)];
+        const values = [nome, JSON.stringify(parsedConteudo)];
         
         await pool.query(query, values);
         res.status(201).json({ mensagem: `JSON '${nome}' salvo com sucesso!` });
@@ -123,7 +243,10 @@ app.post('/api/delete', async (req, res) => {
     }
 
     try {
-        const query = 'DELETE FROM arquivos_json WHERE nome_do_json = $1;';
+        const query = `
+            DELETE FROM arquivos_json 
+            WHERE nome_do_json = $1 OR conteudo->>'id' = $1;
+        `;
         await pool.query(query, [id]);
         res.json({ sucesso: true, mensagem: `Arquivo '${id}' removido com sucesso.` });
     } catch (err) {
@@ -372,8 +495,9 @@ const verificarELimparMaisVistos = async () => {
 
 const executarLimpezaMaisVistosNode = async () => {
     try {
-        const deleteQuery = `
-            DELETE FROM arquivos_json 
+        const resetQuery = `
+            UPDATE arquivos_json 
+            SET conteudo = jsonb_set(conteudo, '{views}', '0'::jsonb)
             WHERE id IN (
                 SELECT id 
                 FROM arquivos_json 
@@ -382,10 +506,10 @@ const executarLimpezaMaisVistosNode = async () => {
                 LIMIT 10
             );
         `;
-        const res = await pool.query(deleteQuery);
-        console.log(`Limpeza concluída. Total de arquivos removidos: ${res.rowCount}`);
+        const res = await pool.query(resetQuery);
+        console.log(`Limpeza semanal concluída. Total de visualizações zeradas: ${res.rowCount}`);
     } catch (err) {
-        console.error("Erro na query de limpeza:", err);
+        console.error("Erro na query de limpeza de visualizações:", err);
     }
 };
 
