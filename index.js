@@ -1,4 +1,7 @@
 require('dotenv').config();
+const dns = require('dns');
+dns.setDefaultResultOrder('ipv4first'); // Corrige o bug de conexão IPv6 no Render
+
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
