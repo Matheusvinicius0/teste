@@ -7,9 +7,50 @@ const cors = require('cors');
 const path = require('path');
 const multer = require('multer');
 const { Pool } = require('pg');
+const tgService = require('./telegram-service');
+const fs = require('fs');
 
 const app = express();
 const upload = multer();
+
+// Configuração do Multer com armazenamento em disco para uploads grandes (Telegram)
+const tempUploadsDir = path.join(__dirname, 'temp_uploads');
+if (!fs.existsSync(tempUploadsDir)) {
+    fs.mkdirSync(tempUploadsDir, { recursive: true });
+}
+const diskUpload = multer({ 
+    dest: tempUploadsDir,
+    limits: { fileSize: 2.5 * 1024 * 1024 * 1024 } // limite de 2.5GB para arquivos de vídeo
+});
+
+// Rastreamento de progresso de downloads/uploads para exibição dinâmica e limpa no terminal (sem inundação de console)
+const activeProcesses = new Map();
+
+function logProcessProgress(key, name, progress) {
+    const percent = (progress * 100).toFixed(1);
+    activeProcesses.set(key, { name, percent });
+
+    const parts = [];
+    for (const [k, val] of activeProcesses.entries()) {
+        const shortName = val.name.length > 20 ? val.name.substring(0, 17) + '...' : val.name;
+        const label = k.startsWith('download') ? '\x1b[35m[Download]\x1b[0m' : '\x1b[36m[Upload Telegram]\x1b[0m';
+        parts.push(`${label} \x1b[33m${shortName}\x1b[0m: \x1b[32m${val.percent}%\x1b[0m`);
+    }
+
+    // Limpa a linha anterior (\x1b[K) e retorna o cursor ao início (\r)
+    process.stdout.write(`\r${parts.join(' | ')}\x1b[K`);
+
+    if (percent === '100.0') {
+        activeProcesses.delete(key);
+        if (activeProcesses.size === 0) {
+            process.stdout.write('\n'); // Quebra de linha limpa ao concluir tudo
+        }
+    }
+}
+
+// Inicializar cliente do Telegram em segundo plano
+tgService.initClient();
+
 
 // Otimização: Limita o tamanho do JSON para 2MB para não estourar a RAM no plano gratuito
 app.use(express.json({ limit: '2mb' })); 
@@ -85,6 +126,7 @@ async function getTMDBInfo(id) {
             return {
                 title: movie.title,
                 year: movie.release_date ? movie.release_date.substring(0, 4) : "",
+                release_date: movie.release_date || "",
                 type: "movie"
             };
         } else if (data.tv_results && data.tv_results.length > 0) {
@@ -92,6 +134,7 @@ async function getTMDBInfo(id) {
             return {
                 title: show.name,
                 year: show.first_air_date ? show.first_air_date.substring(0, 4) : "",
+                release_date: show.first_air_date || "",
                 type: "series"
             };
         }
@@ -207,9 +250,9 @@ app.post('/upload', upload.none(), async (req, res) => {
 // ==========================================
 app.get('/api/all', async (req, res) => {
     try {
-        const query = 'SELECT nome_do_json, conteudo FROM arquivos_json ORDER BY criado_em DESC;';
+        const query = 'SELECT conteudo FROM arquivos_json ORDER BY criado_em DESC;';
         const result = await pool.query(query);
-        res.json(result.rows);
+        res.json(result.rows.map(r => r.conteudo));
     } catch (err) {
         console.error(err);
         res.status(500).json({ erro: 'Erro ao buscar os dados.' });
@@ -313,7 +356,7 @@ app.get('/api/vistos', async (req, res) => {
     try {
         const query = `
             SELECT 
-                nome_do_json AS id, 
+                COALESCE(conteudo->>'id', nome_do_json) AS id, 
                 COALESCE((conteudo->>'views')::int, 0) AS v
             FROM arquivos_json
             ORDER BY v DESC;
@@ -381,6 +424,15 @@ app.post('/api/pedidos', async (req, res) => {
     }
 
     try {
+        // Verificar se já foi lançado no TMDB
+        const tmdbData = await getTMDBInfo(id);
+        if (tmdbData && tmdbData.release_date) {
+            const today = new Date().toISOString().split('T')[0];
+            if (tmdbData.release_date > today) {
+                return res.status(400).json({ erro: `Conteúdo não lançado ainda (Lançamento: ${tmdbData.release_date}).` });
+            }
+        }
+
         const query = `
             INSERT INTO pedidos_sugeridos (imdb_id, tipo, episodio)
             VALUES ($1, $2, $3)
@@ -404,6 +456,15 @@ app.get('/api/pedidos', async (req, res) => {
     // Se o usuário passou parâmetros de busca na URL (GET), ele quer criar um pedido direto pelo link do navegador
     if (id && type) {
         try {
+            // Verificar se já foi lançado no TMDB
+            const tmdbData = await getTMDBInfo(id);
+            if (tmdbData && tmdbData.release_date) {
+                const today = new Date().toISOString().split('T')[0];
+                if (tmdbData.release_date > today) {
+                    return res.status(400).json({ erro: `Conteúdo não lançado ainda (Lançamento: ${tmdbData.release_date}).` });
+                }
+            }
+
             const queryInsert = `
                 INSERT INTO pedidos_sugeridos (imdb_id, tipo, episodio)
                 VALUES ($1, $2, $3);
@@ -465,6 +526,148 @@ app.post('/api/pedidos/delete', async (req, res) => {
 });
 
 // ==========================================
+// ROTAS DO TELEGRAM
+// ==========================================
+
+// Rota 10: Obter Status do Telegram
+app.get('/api/telegram/status', (req, res) => {
+    // Retorna se o servidor possui sessão global ou está pronto
+    const status = tgService.getStatus();
+    res.json(status);
+});
+
+// Nova Rota: Iniciar login do Telegram por telefone
+app.post('/api/telegram/login-phone', async (req, res) => {
+    const { phone } = req.body;
+    if (!phone) {
+        return res.status(400).json({ erro: 'O número de telefone é obrigatório.' });
+    }
+    try {
+        const result = await tgService.sendPhoneCode(phone);
+        res.json(result);
+    } catch (err) {
+        console.error("Erro ao solicitar código do Telegram:", err);
+        res.status(500).json({ erro: err.message || 'Erro ao enviar código de login.' });
+    }
+});
+
+// Nova Rota: Concluir login do Telegram com código e 2FA
+app.post('/api/telegram/login-code', async (req, res) => {
+    const { loginId, code, password } = req.body;
+    if (!loginId || !code) {
+        return res.status(400).json({ erro: 'O loginId e o código de verificação são obrigatórios.' });
+    }
+    try {
+        const sessionString = await tgService.verifyPhoneCode(loginId, code, password);
+        res.json({ sucesso: true, session: sessionString });
+    } catch (err) {
+        console.error("Erro ao verificar código do Telegram:", err);
+        if (err.message === "SESSION_PASSWORD_NEEDED") {
+            return res.json({ sucesso: false, precisa2FA: true, erro: "Senha de verificação em duas etapas (2FA) necessária." });
+        }
+        res.status(500).json({ erro: err.message || 'Erro ao validar login.' });
+    }
+});
+
+// Rota 11: Upload de arquivo pelo navegador e envio ao Telegram (Público)
+app.post('/api/telegram/upload', diskUpload.single('video'), async (req, res) => {
+    if (!req.file) {
+        return res.status(400).json({ erro: 'Nenhum arquivo enviado.' });
+    }
+
+    const tempFilePath = req.file.path;
+    const originalName = req.file.originalname;
+    const customSession = req.headers['x-telegram-session'] || null;
+    const botToken = req.headers['x-telegram-bot-token'] || null;
+    const channelId = req.headers['x-telegram-channel-id'] || null;
+
+    try {
+        const link = await tgService.uploadFileAndGetLink(tempFilePath, originalName, (progress) => {
+            logProcessProgress('upload-' + originalName, originalName, progress);
+        }, customSession, botToken, channelId);
+
+        res.json({ sucesso: true, link: link });
+    } catch (err) {
+        console.error("Erro no upload para o Telegram:", err);
+        res.status(500).json({ erro: err.message || 'Erro ao enviar arquivo para o Telegram.' });
+    } finally {
+        if (fs.existsSync(tempFilePath)) {
+            fs.unlinkSync(tempFilePath);
+        }
+    }
+});
+
+// Rota 12: Envio de arquivo local (por caminho no disco)
+app.post('/api/telegram/local-path', async (req, res) => {
+    const { localPath, senha } = req.body;
+    const adminPassword = process.env.ADMIN_PASSWORD || "sua_senha_padrao_aqui";
+
+    if (senha !== adminPassword) {
+        return res.status(401).json({ erro: 'Senha incorreta.' });
+    }
+
+    if (!localPath) {
+        return res.status(400).json({ erro: 'O caminho do arquivo local (localPath) é obrigatório.' });
+    }
+
+    const resolvedPath = path.resolve(localPath);
+    if (!fs.existsSync(resolvedPath)) {
+        return res.status(400).json({ erro: `Arquivo não encontrado no caminho: ${resolvedPath}` });
+    }
+
+    const fileName = path.basename(resolvedPath);
+    const customSession = req.headers['x-telegram-session'] || null;
+    const botToken = req.headers['x-telegram-bot-token'] || null;
+    const channelId = req.headers['x-telegram-channel-id'] || null;
+
+    try {
+        const link = await tgService.uploadFileAndGetLink(resolvedPath, fileName, (progress) => {
+            logProcessProgress('upload-' + fileName, fileName, progress);
+        }, customSession, botToken, channelId);
+
+        res.json({ sucesso: true, link: link });
+    } catch (err) {
+        console.error("Erro no envio local para o Telegram:", err);
+        res.status(500).json({ erro: err.message || 'Erro ao enviar arquivo local para o Telegram.' });
+    }
+});
+
+// Rota 13: Baixar vídeo de uma URL externa, enviar ao Telegram e retornar o link (Público)
+app.post('/api/telegram/migrate-url', async (req, res) => {
+    const { url, fileName } = req.body;
+
+    if (!url) {
+        return res.status(400).json({ erro: 'A URL do vídeo é obrigatória.' });
+    }
+
+    const defaultName = fileName || `video-${Date.now()}.mp4`;
+    const customSession = req.headers['x-telegram-session'] || null;
+    const botToken = req.headers['x-telegram-bot-token'] || null;
+    const channelId = req.headers['x-telegram-channel-id'] || null;
+
+    try {
+        const link = await tgService.downloadAndUploadUrl(
+            url,
+            defaultName,
+            (progress) => {
+                logProcessProgress('download-' + defaultName, defaultName, progress);
+            },
+            (progress) => {
+                logProcessProgress('upload-' + defaultName, defaultName, progress);
+            },
+            customSession,
+            botToken,
+            channelId
+        );
+
+        res.json({ sucesso: true, link: link });
+    } catch (err) {
+        console.error("Erro na migração de URL:", err);
+        res.status(500).json({ erro: err.message || 'Erro ao processar e enviar link para o Telegram.' });
+    }
+});
+
+// ==========================================
 // TAREFA AGENDADA: Limpeza semanal dos arquivos mais vistos
 // ==========================================
 const verificarELimparMaisVistos = async () => {
@@ -520,7 +723,7 @@ const executarLimpezaMaisVistosNode = async () => {
 // INICIALIZAÇÃO DO SERVIDOR
 // ==========================================
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, async () => {
+const server = app.listen(PORT, async () => {
     console.log(`Servidor rodando na porta ${PORT}`);
     
     // Executa verificação inicial de limpeza
@@ -529,3 +732,6 @@ app.listen(PORT, async () => {
     // Agenda para rodar a cada 1 hora
     setInterval(verificarELimparMaisVistos, 60 * 60 * 1000);
 });
+
+// Desativa o timeout padrão de 5 minutos do Node.js para uploads grandes
+server.timeout = 0;

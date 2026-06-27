@@ -95,13 +95,13 @@
                 <button onclick="switchView('generator')" id="btn-generator" class="nav-btn px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 hover:bg-zinc-900">
                     <i class="fa-solid fa-code"></i> <span class="hidden sm:inline">Criar JSON</span>
                 </button>
-                <button onclick="switchView('requests'); reqProcessor.loadFromDB();" id="btn-requests" class="nav-btn px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 hover:bg-zinc-900">
+                <button onclick="switchView('requests'); reqProcessor.loadFromDB();" id="btn-requests" class="nav-btn hidden px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 hover:bg-zinc-900">
                     <i class="fa-solid fa-list-check"></i> <span class="hidden md:inline">Pedidos</span>
                 </button>
                 <button onclick="switchView('catalog'); setTimeout(() => cat.filter('all'), 50);" id="btn-catalog" class="nav-btn active px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
                     <i class="fa-solid fa-layer-group"></i> <span class="hidden sm:inline">Catálogo</span>
                 </button>
-                <button onclick="switchView('storage'); loadStorageStats();" id="btn-storage" class="nav-btn px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 hover:bg-zinc-900">
+                <button onclick="switchView('storage'); loadStorageStats();" id="btn-storage" class="nav-btn hidden px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 hover:bg-zinc-900">
                     <i class="fa-solid fa-database"></i> <span class="hidden sm:inline">Armazenamento</span>
                 </button>
                 <a href="https://fenixflix-ur9u.onrender.com/" target="_blank" class="px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 bg-purple-600 hover:bg-purple-500 text-white">
@@ -230,6 +230,9 @@
                             <div class="flex justify-between items-end mb-3">
                                 <label class="block text-xs font-medium text-zinc-500">Links de Transmissão</label>
                                 <div class="flex gap-2">
+                                    <button onclick="tg.migrateAllLinks()" class="text-[10px] text-sky-400 hover:text-sky-300 px-2 py-1 rounded transition flex items-center gap-1" title="Enviar links externos para o Telegram para gerar links do bot">
+                                        <i class="fa-brands fa-telegram"></i> Converter p/ Telegram
+                                    </button>
                                     <button onclick="gen.migrateHost()" class="text-[10px] text-zinc-400 hover:text-white px-2 py-1 rounded transition flex items-center gap-1">
                                         <i class="fa-solid fa-rotate"></i> Migrar Render
                                     </button>
@@ -240,6 +243,120 @@
                                 </div>
                             </div>
                             <textarea id="manualLinks" rows="6" class="input-unified w-full p-4 rounded-xl text-xs font-mono custom-scrollbar" placeholder="Cole os links de vídeo diretos aqui..."></textarea>
+                        </div>
+
+                        <!-- Enviar para Telegram -->
+                        <div class="mt-5 bg-zinc-950/40 border border-zinc-800/80 rounded-xl p-4">
+                            <h4 class="text-xs font-semibold text-zinc-400 mb-3 flex items-center justify-between">
+                                <span class="flex items-center gap-1.5">
+                                    <i class="fa-brands fa-telegram text-sky-400"></i> Upload para o Telegram
+                                </span>
+                                <div class="flex items-center gap-2">
+                                    <span id="tgStatusBadge" class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-zinc-900 text-zinc-500">Verificando...</span>
+                                    <button onclick="tg.toggleConnection()" id="btnTgConnectToggle" class="text-[9px] font-semibold text-indigo-400 hover:underline">Conectar</button>
+                                </div>
+                            </h4>
+
+                            <!-- Painel de Login/Conexão do Telegram -->
+                            <div id="tgLoginPanel" class="hidden mb-4 p-3 bg-zinc-900/60 rounded-lg border border-zinc-800 space-y-3">
+                                <p class="text-[10px] text-zinc-400">Conecte sua conta do Telegram para poder converter vídeos usando sua própria conta:</p>
+                                
+                                <!-- Passo 1: Telefone -->
+                                <div id="tgLoginPhoneStep" class="flex gap-2">
+                                    <input type="text" id="tgPhoneInput" class="input-unified flex-grow p-2 rounded-lg text-xs" placeholder="Telefone, ex: +5511999999999">
+                                    <button onclick="tg.sendPhone()" id="btnTgSendPhone" class="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-2 rounded-lg text-xs font-medium transition shrink-0">
+                                        Enviar Código
+                                    </button>
+                                </div>
+
+                                <!-- Passo 2: Código e 2FA -->
+                                <div id="tgLoginCodeStep" class="hidden space-y-3">
+                                    <input type="hidden" id="tgLoginId">
+                                    <div class="flex gap-2">
+                                        <input type="text" id="tgCodeInput" class="input-unified flex-grow p-2 rounded-lg text-xs" placeholder="Código do Telegram">
+                                        <button onclick="tg.verifyCode()" id="btnTgVerifyCode" class="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-2 rounded-lg text-xs font-medium transition shrink-0">
+                                            Confirmar
+                                        </button>
+                                    </div>
+                                    <div id="tg2faContainer" class="hidden">
+                                        <label class="block text-[9px] text-zinc-500 mb-1">Senha de 2 etapas (2FA) necessária:</label>
+                                        <input type="password" id="tg2faInput" class="input-unified w-full p-2 rounded-lg text-xs" placeholder="Sua senha de duas etapas">
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="space-y-3">
+                                <!-- Opção de Envio: Navegador vs Local -->
+                                <div class="flex gap-4 border-b border-zinc-800/60 pb-2 text-[11px]">
+                                    <label class="flex items-center gap-1.5 cursor-pointer text-zinc-400 hover:text-zinc-200">
+                                        <input type="radio" name="tgMode" value="browser" checked onchange="tg.switchMode('browser')" class="text-sky-500 bg-zinc-900 border-zinc-800 focus:ring-sky-500 w-3 h-3">
+                                        <span>Pelo Navegador</span>
+                                    </label>
+                                    <label class="flex items-center gap-1.5 cursor-pointer text-zinc-400 hover:text-zinc-200">
+                                        <input type="radio" name="tgMode" value="local" onchange="tg.switchMode('local')" class="text-sky-500 bg-zinc-900 border-zinc-800 focus:ring-sky-500 w-3 h-3">
+                                        <span>Caminho Local (PC)</span>
+                                    </label>
+                                </div>
+
+                                <!-- Upload pelo Navegador -->
+                                <div id="tgBrowserSection" class="flex gap-2">
+                                    <input type="file" id="tgFile" class="hidden" multiple onchange="tg.handleFileChange(this)">
+                                    <label for="tgFile" class="input-unified flex-grow p-2.5 rounded-lg text-xs cursor-pointer flex items-center gap-2 hover:bg-zinc-900 truncate">
+                                        <i class="fa-solid fa-file-video text-zinc-500"></i>
+                                        <span id="tgFileName" class="text-zinc-500">Selecionar vídeo...</span>
+                                    </label>
+                                    <button onclick="tg.sendBrowser()" id="btnTgBrowserSend" class="bg-sky-600 hover:bg-sky-500 text-white px-4 py-2.5 rounded-lg text-xs font-medium transition flex items-center gap-1 shrink-0">
+                                        <i class="fa-solid fa-paper-plane"></i> Enviar
+                                    </button>
+                                </div>
+
+                                <!-- Upload por Caminho Local -->
+                                <div id="tgLocalSection" class="hidden flex gap-2">
+                                    <input type="text" id="tgLocalPath" class="input-unified flex-grow p-2.5 rounded-lg text-xs" placeholder="Ex: /home/user/Videos/filme.mp4">
+                                    <button onclick="tg.sendLocal()" id="btnTgLocalSend" class="bg-sky-600 hover:bg-sky-500 text-white px-4 py-2.5 rounded-lg text-xs font-medium transition flex items-center gap-1 shrink-0">
+                                        <i class="fa-solid fa-paper-plane"></i> Enviar
+                                    </button>
+                                </div>
+
+                                <!-- Configurações Avançadas (Canal & Bot) -->
+                                <div class="mt-2 p-3 bg-zinc-950/40 rounded-xl border border-zinc-800/80 space-y-2.5">
+                                    <div class="flex justify-between items-center cursor-pointer select-none" onclick="tg.toggleAdvanced()">
+                                        <span class="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider flex items-center gap-1.5">
+                                            <i class="fa-solid fa-sliders text-indigo-400"></i> Configurações Avançadas (Canal & Bot)
+                                        </span>
+                                        <i id="tgAdvancedIcon" class="fa-solid fa-chevron-down text-zinc-500 text-[10px] transition-transform duration-300"></i>
+                                    </div>
+                                    <div id="tgAdvancedContent" class="hidden space-y-2.5 pt-2 border-t border-zinc-800/40">
+                                        <div>
+                                            <label class="block text-[9px] text-zinc-500 mb-1">Token de Bot Próprio (Opcional):</label>
+                                            <input type="text" id="tgBotToken" class="input-unified w-full p-2 rounded-lg text-xs" placeholder="Ex: token1, token2 (separe por vírgula para múltiplos)">
+                                        </div>
+                                        <div>
+                                            <label class="block text-[9px] text-zinc-500 mb-1">Username ou ID do Canal de Backup (Opcional):</label>
+                                            <input type="text" id="tgChannelId" class="input-unified w-full p-2 rounded-lg text-xs" placeholder="Ex: @meucanal ou -100123456789">
+                                        </div>
+                                        <p class="text-[9px] text-zinc-500 leading-relaxed">
+                                            * Ao preencher ambos, o upload será dividido em paralelo entre seus Bots e sua Conta de Usuário (concorrência = número de bots + 1), postando no canal e encaminhando de lá para o bot de streaming.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <!-- Progresso e Status -->
+                                <div id="tgProgressBox" class="hidden space-y-1.5">
+                                    <div class="flex justify-between text-[10px] text-zinc-500">
+                                        <span id="tgProgressState">Enviando arquivo...</span>
+                                        <span id="tgPercent">0%</span>
+                                    </div>
+                                    <div class="w-full bg-zinc-900 rounded-full h-1.5 overflow-hidden border border-zinc-800">
+                                        <div id="tgProgressBar" class="bg-sky-500 h-full w-0 transition-all duration-300"></div>
+                                    </div>
+                                </div>
+
+                                <div id="tgFeedback" class="text-[10px] text-zinc-500 flex items-center gap-1">
+                                    <i class="fa-solid fa-info-circle"></i>
+                                    <span id="tgFeedbackText">O vídeo será enviado para @fenix_flixbot e o link gerado será adicionado aos Links de Transmissão.</span>
+                                </div>
+                            </div>
                         </div>
 
                         <button onclick="gen.process()" class="mt-6 w-full bg-white hover:bg-zinc-200 text-zinc-950 font-medium py-3.5 rounded-xl transition flex justify-center items-center gap-2">
@@ -323,6 +440,16 @@
                         </select>
                         <i class="fa-solid fa-chevron-down absolute right-4 top-1/2 -translate-y-1/2 text-zinc-600 text-xs pointer-events-none"></i>
                     </div>
+
+                    <div class="relative w-full sm:w-44">
+                        <select id="cat-filter-type" onchange="cat.filter(this.value)" class="w-full bg-zinc-900 text-zinc-200 text-sm rounded-xl px-4 py-2.5 border border-zinc-800 focus:border-zinc-600 focus:outline-none appearance-none cursor-pointer">
+                            <option value="all">Todos</option>
+                            <option value="series">Séries</option>
+                            <option value="movie">Filmes</option>
+                            <option value="missing_all">Incompletos</option>
+                        </select>
+                        <i class="fa-solid fa-chevron-down absolute right-4 top-1/2 -translate-y-1/2 text-zinc-600 text-xs pointer-events-none"></i>
+                    </div>
                 </div>
                 
                 <div class="flex gap-2 w-full lg:w-auto overflow-x-auto pb-2 lg:pb-0 scrollbar-hide items-center">
@@ -335,16 +462,6 @@
                         <i class="fa-solid fa-cloud-arrow-up"></i> Upload Lote
                         <input type="file" accept=".json" multiple class="hidden" onchange="cat.uploadEmMassa(this)">
                     </label>
-                    
-                    <button onclick="cat.filter('all')" id="btn-all" class="filter-btn bg-white text-zinc-900 px-5 py-2 rounded-xl text-xs font-medium whitespace-nowrap transition-colors shadow-sm">Todos</button>
-                    <button onclick="cat.filter('series')" id="btn-series" class="filter-btn bg-zinc-900 text-zinc-400 border border-zinc-800 hover:text-zinc-200 px-5 py-2 rounded-xl text-xs font-medium whitespace-nowrap transition-colors">Séries</button>
-                    <button onclick="cat.filter('movie')" id="btn-movie" class="filter-btn bg-zinc-900 text-zinc-400 border border-zinc-800 hover:text-zinc-200 px-5 py-2 rounded-xl text-xs font-medium whitespace-nowrap transition-colors">Filmes</button>
-                    
-                    <div class="w-px h-6 bg-zinc-800 mx-1 hidden sm:block"></div>
-                    
-                    <button onclick="cat.filter('missing_all')" id="btn-missing_all" class="filter-btn bg-zinc-900 text-amber-500 border border-zinc-800 hover:bg-zinc-800 px-5 py-2 rounded-xl text-xs font-medium whitespace-nowrap transition-colors flex items-center gap-2">
-                        <i class="fa-solid fa-triangle-exclamation"></i> Incompletos
-                    </button>
                 </div>
             </div>
 
@@ -422,6 +539,10 @@
                         <option value="all">Todos Tipos</option>
                         <option value="movie">Filmes</option>
                         <option value="series">Séries</option>
+                    </select>
+                    <select id="req-filter-release" onchange="reqProcessor.renderList()" class="bg-zinc-950 text-white text-sm rounded-xl px-4 py-2 border border-zinc-800 focus:outline-none appearance-none cursor-pointer">
+                        <option value="released">Apenas Lançados</option>
+                        <option value="all">Todos (Incluir Não Lançados)</option>
                     </select>
                 </div>
 
@@ -815,13 +936,11 @@
             // 1. Ocultar/Exibir botões de navegação
             const btnGenerator = document.getElementById('btn-generator');
             const btnStorage = document.getElementById('btn-storage');
+            const btnRequests = document.getElementById('btn-requests');
             
             if (btnGenerator) {
-                if (isLogged) {
-                    btnGenerator.classList.remove('hidden');
-                } else {
-                    btnGenerator.classList.add('hidden');
-                }
+                // O Gerador é público para que qualquer um possa usar o buscador e upload do Telegram
+                btnGenerator.classList.remove('hidden');
             }
             if (btnStorage) {
                 if (isLogged) {
@@ -830,10 +949,17 @@
                     btnStorage.classList.add('hidden');
                 }
             }
+            if (btnRequests) {
+                if (isLogged) {
+                    btnRequests.classList.remove('hidden');
+                } else {
+                    btnRequests.classList.add('hidden');
+                }
+            }
             
-            // Se não estiver logado e estiver na aba de gerador ou armazenamento, volta para o catálogo
+            // Se não estiver logado e estiver na aba de pedidos ou armazenamento, volta para o catálogo (o gerador agora é público)
             const activeTab = document.querySelector('.tab-content.active');
-            if (!isLogged && activeTab && (activeTab.id === 'view-generator' || activeTab.id === 'view-storage')) {
+            if (!isLogged && activeTab && (activeTab.id === 'view-requests' || activeTab.id === 'view-storage')) {
                 switchView('catalog');
                 setTimeout(() => cat.filter('all'), 50);
             }
@@ -925,6 +1051,630 @@
                 cat.init();
             }
         }
+
+        // --- MÓDULO 0: SERVIÇO TELEGRAM ---
+        const tg = {
+            status: { configured: false, connected: false },
+            
+            init: async () => {
+                // Carrega configurações avançadas do localStorage
+                const botTokenInput = document.getElementById('tgBotToken');
+                const channelIdInput = document.getElementById('tgChannelId');
+                
+                if (botTokenInput && channelIdInput) {
+                    botTokenInput.value = localStorage.getItem('fenixflix_tg_bot_token') || '';
+                    channelIdInput.value = localStorage.getItem('fenixflix_tg_channel_id') || '';
+                    
+                    botTokenInput.addEventListener('input', (e) => {
+                        localStorage.setItem('fenixflix_tg_bot_token', e.target.value.trim());
+                    });
+                    channelIdInput.addEventListener('input', (e) => {
+                        localStorage.setItem('fenixflix_tg_channel_id', e.target.value.trim());
+                    });
+                }
+
+                await tg.checkStatus();
+                setInterval(tg.checkStatus, 15000);
+            },
+
+            toggleAdvanced: () => {
+                const content = document.getElementById('tgAdvancedContent');
+                const icon = document.getElementById('tgAdvancedIcon');
+                if (content.classList.contains('hidden')) {
+                    content.classList.remove('hidden');
+                    icon.classList.add('rotate-180');
+                } else {
+                    content.classList.add('hidden');
+                    icon.classList.remove('rotate-180');
+                }
+            },
+
+            checkStatus: async () => {
+                const localSession = localStorage.getItem('fenixflix_tg_session');
+                if (localSession) {
+                    // Se o usuário tem uma sessão salva localmente, ele está conectado!
+                    tg.status = { configured: true, connected: true, local: true };
+                    tg.updateUIStatus();
+                    return;
+                }
+
+                try {
+                    const res = await fetch('/api/telegram/status');
+                    if (res.ok) {
+                        const globalStatus = await res.json();
+                        tg.status = { ...globalStatus, local: false };
+                        tg.updateUIStatus();
+                    }
+                } catch (e) {
+                    console.error("Erro ao verificar status do Telegram:", e);
+                }
+            },
+
+            updateUIStatus: () => {
+                const badge = document.getElementById('tgStatusBadge');
+                const btnToggle = document.getElementById('btnTgConnectToggle');
+                const btnBrowser = document.getElementById('btnTgBrowserSend');
+                const btnLocal = document.getElementById('btnTgLocalSend');
+                const feedbackText = document.getElementById('tgFeedbackText');
+
+                const hasLocalSession = localStorage.getItem('fenixflix_tg_session') !== null;
+
+                if (hasLocalSession) {
+                    badge.className = "text-[9px] font-mono px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-900";
+                    badge.innerText = "Conectado (Web)";
+                    btnToggle.innerText = "Desconectar";
+                    btnToggle.className = "text-[9px] font-semibold text-red-400 hover:underline";
+                    btnBrowser.disabled = false;
+                    btnLocal.disabled = false;
+                    feedbackText.innerText = "Conectado usando sua conta do Telegram. Pronto para converter vídeos!";
+                } else if (!tg.status.configured) {
+                    badge.className = "text-[9px] font-mono px-1.5 py-0.5 rounded bg-amber-950 text-amber-300 border border-amber-900";
+                    badge.innerText = "Não configurado (.env)";
+                    btnToggle.innerText = "Conectar";
+                    btnToggle.className = "text-[9px] font-semibold text-indigo-400 hover:underline";
+                    btnBrowser.disabled = true;
+                    btnLocal.disabled = true;
+                    feedbackText.innerText = "O Telegram do servidor não está configurado. Conecte sua conta do Telegram para usar.";
+                } else if (!tg.status.connected) {
+                    badge.className = "text-[9px] font-mono px-1.5 py-0.5 rounded bg-red-950 text-red-300 border border-red-900 animate-pulse";
+                    badge.innerText = "Desconectado";
+                    btnToggle.innerText = "Conectar";
+                    btnToggle.className = "text-[9px] font-semibold text-indigo-400 hover:underline";
+                    btnBrowser.disabled = true;
+                    btnLocal.disabled = true;
+                    feedbackText.innerText = "Telegram do servidor desconectado. Conecte sua conta do Telegram para usar.";
+                } else {
+                    // Conectado com a conta global do servidor
+                    badge.className = "text-[9px] font-mono px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-900";
+                    badge.innerText = "Conectado (Server)";
+                    btnToggle.innerText = "Conectar Outro";
+                    btnToggle.className = "text-[9px] font-semibold text-indigo-400 hover:underline";
+                    btnBrowser.disabled = false;
+                    btnLocal.disabled = false;
+                    feedbackText.innerText = "Conectado usando a conta padrão do servidor. Pronto para converter vídeos!";
+                }
+            },
+
+            toggleConnection: () => {
+                const hasLocalSession = localStorage.getItem('fenixflix_tg_session') !== null;
+                const panel = document.getElementById('tgLoginPanel');
+
+                if (hasLocalSession) {
+                    tg.logout();
+                } else {
+                    panel.classList.toggle('hidden');
+                    // Reseta estado do form de login
+                    document.getElementById('tgLoginPhoneStep').classList.remove('hidden');
+                    document.getElementById('tgLoginCodeStep').classList.add('hidden');
+                    document.getElementById('tg2faContainer').classList.add('hidden');
+                    document.getElementById('tgPhoneInput').value = '';
+                    document.getElementById('tgCodeInput').value = '';
+                    document.getElementById('tg2faInput').value = '';
+                }
+            },
+
+            logout: () => {
+                localStorage.removeItem('fenixflix_tg_session');
+                showToast("Sessão do Telegram encerrada localmente.", "info");
+                tg.updateUIStatus();
+            },
+
+            sendPhone: async () => {
+                const phoneInput = document.getElementById('tgPhoneInput');
+                const phone = phoneInput.value.trim();
+                const btn = document.getElementById('btnTgSendPhone');
+
+                if (!phone) return showToast("Digite seu número de telefone com DDI!", "warning");
+
+                btn.disabled = true;
+                btn.innerHTML = '<div class="loader"></div>';
+
+                try {
+                    const res = await fetch('/api/telegram/login-phone', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ phone })
+                    });
+                    const data = await res.json();
+
+                    if (res.ok && data.loginId) {
+                        document.getElementById('tgLoginId').value = data.loginId;
+                        document.getElementById('tgLoginPhoneStep').classList.add('hidden');
+                        document.getElementById('tgLoginCodeStep').classList.remove('hidden');
+                        showToast("Código de verificação enviado! Verifique seu Telegram.", "success");
+                    } else {
+                        showToast(data.erro || "Falha ao enviar código.", "error");
+                    }
+                } catch (e) {
+                    showToast("Erro ao conectar com o servidor.", "error");
+                } finally {
+                    btn.disabled = false;
+                    btn.innerText = "Enviar Código";
+                }
+            },
+
+            verifyCode: async () => {
+                const loginId = document.getElementById('tgLoginId').value;
+                const code = document.getElementById('tgCodeInput').value.trim();
+                const password = document.getElementById('tg2faInput').value.trim();
+                const btn = document.getElementById('btnTgVerifyCode');
+
+                if (!code) return showToast("Digite o código recebido!", "warning");
+
+                btn.disabled = true;
+                btn.innerHTML = '<div class="loader"></div>';
+
+                try {
+                    const res = await fetch('/api/telegram/login-code', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ loginId, code, password })
+                    });
+                    const data = await res.json();
+
+                    if (res.ok) {
+                        if (data.precisa2FA) {
+                            document.getElementById('tg2faContainer').classList.remove('hidden');
+                            showToast("Esta conta possui verificação de duas etapas. Digite sua senha de 2FA.", "warning");
+                        } else if (data.sucesso && data.session) {
+                            localStorage.setItem('fenixflix_tg_session', data.session);
+                            document.getElementById('tgLoginPanel').classList.add('hidden');
+                            showToast("Telegram conectado com sucesso!", "success");
+                            tg.updateUIStatus();
+                        } else {
+                            showToast(data.erro || "Falha na validação.", "error");
+                        }
+                    } else {
+                        showToast(data.erro || "Erro de validação do código.", "error");
+                    }
+                } catch (e) {
+                    showToast("Erro ao conectar com o servidor.", "error");
+                } finally {
+                    btn.disabled = false;
+                    btn.innerText = "Confirmar";
+                }
+            },
+
+            switchMode: (mode) => {
+                if (mode === 'browser') {
+                    document.getElementById('tgBrowserSection').classList.remove('hidden');
+                    document.getElementById('tgLocalSection').classList.add('hidden');
+                } else {
+                    document.getElementById('tgBrowserSection').classList.add('hidden');
+                    document.getElementById('tgLocalSection').classList.remove('hidden');
+                }
+            },
+
+            handleFileChange: (input) => {
+                const files = input.files;
+                const label = document.getElementById('tgFileName');
+                if (files && files.length > 0) {
+                    if (files.length === 1) {
+                        label.innerText = files[0].name;
+                    } else {
+                        label.innerText = `${files.length} arquivos selecionados`;
+                    }
+                    label.classList.remove('text-zinc-500');
+                    label.classList.add('text-zinc-200');
+                } else {
+                    label.innerText = "Selecionar vídeo...";
+                    label.classList.remove('text-zinc-200');
+                    label.classList.add('text-zinc-500');
+                }
+            },
+
+            sendBrowser: async () => {
+                const fileInput = document.getElementById('tgFile');
+                const files = Array.from(fileInput.files);
+                if (files.length === 0) return showToast("Selecione pelo menos um arquivo primeiro!", "warning");
+
+                // 1. Ordena os arquivos de forma natural (ex: Episódio 2 antes de Episódio 10)
+                files.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
+
+                const botTokenInput = document.getElementById('tgBotToken').value.trim();
+                const channelId = document.getElementById('tgChannelId').value.trim();
+                const botTokens = botTokenInput ? botTokenInput.split(',').map(t => t.trim()).filter(Boolean) : [];
+                const hasBotConfig = botTokens.length > 0 && channelId;
+
+                const progressBox = document.getElementById('tgProgressBox');
+                const progressBar = document.getElementById('tgProgressBar');
+                const percentText = document.getElementById('tgPercent');
+                const progressState = document.getElementById('tgProgressState');
+                const btn = document.getElementById('btnTgBrowserSend');
+
+                progressBox.classList.remove('hidden');
+                btn.disabled = true;
+                btn.innerHTML = '<div class="loader"></div> Enviando...';
+
+                // 2. Insere placeholders ordenados no final do textarea em tempo real
+                const textarea = document.getElementById('manualLinks');
+                let currentText = textarea.value.trim();
+                const startLineIndex = currentText ? textarea.value.split('\n').length : 0;
+                
+                const placeholders = files.map(file => `[Aguardando envio: ${file.name}]`);
+                if (currentText) {
+                    textarea.value = currentText + '\n' + placeholders.join('\n');
+                } else {
+                    textarea.value = placeholders.join('\n');
+                }
+                textarea.dispatchEvent(new Event('input'));
+
+                // Array para armazenar o progresso de cada arquivo (valores de 0 a 1)
+                const progressValues = new Array(files.length).fill(0);
+                // Contador de arquivos concluídos/falhos
+                let completedCount = 0;
+                let successCount = 0;
+
+                const updateGlobalProgress = () => {
+                    const averageProgress = progressValues.reduce((sum, val) => sum + val, 0) / files.length;
+                    const percent = Math.round(averageProgress * 100);
+                    progressBar.style.width = percent + '%';
+                    percentText.innerText = percent + '%';
+                    
+                    progressState.innerText = `Enviando ${files.length} arquivo(s) (${successCount}/${files.length} concluídos)...`;
+                };
+
+                updateGlobalProgress();
+
+                const uploadSingleFile = (file, index) => {
+                    return new Promise((resolve) => {
+                        const formData = new FormData();
+                        formData.append('video', file);
+
+                        const xhr = new XMLHttpRequest();
+                        xhr.open('POST', '/api/telegram/upload', true);
+
+                        const session = localStorage.getItem('fenixflix_tg_session');
+                        if (session) {
+                            xhr.setRequestHeader('X-Telegram-Session', session);
+                        }
+
+                        if (hasBotConfig) {
+                            const uploaderIndex = index % (botTokens.length + 1);
+                            if (uploaderIndex === 0) {
+                                xhr.setRequestHeader('X-Telegram-Channel-Id', channelId);
+                            } else {
+                                const activeBotToken = botTokens[uploaderIndex - 1];
+                                xhr.setRequestHeader('X-Telegram-Bot-Token', activeBotToken);
+                                xhr.setRequestHeader('X-Telegram-Channel-Id', channelId);
+                            }
+                        } else if (channelId) {
+                            xhr.setRequestHeader('X-Telegram-Channel-Id', channelId);
+                        }
+
+                        xhr.upload.onprogress = (e) => {
+                            if (e.lengthComputable) {
+                                // 0% a 95% para o envio HTTP, os últimos 5% são para a resposta do bot
+                                progressValues[index] = (e.loaded / e.total) * 0.95;
+                                updateGlobalProgress();
+                            }
+                        };
+
+                        xhr.onload = function () {
+                            if (xhr.status === 200) {
+                                try {
+                                    const res = JSON.parse(xhr.responseText);
+                                    if (res.sucesso && res.link) {
+                                        // Substitui o placeholder pelo link retornado
+                                        const currentLines = textarea.value.split('\n');
+                                        currentLines[startLineIndex + index] = res.link;
+                                        textarea.value = currentLines.join('\n');
+                                        textarea.dispatchEvent(new Event('input'));
+
+                                        progressValues[index] = 1.0;
+                                        successCount++;
+                                    } else {
+                                        // Substitui o placeholder por mensagem de erro
+                                        const currentLines = textarea.value.split('\n');
+                                        currentLines[startLineIndex + index] = `[Erro: ${file.name} - ${res.erro || "Desconhecido"}]`;
+                                        textarea.value = currentLines.join('\n');
+                                        textarea.dispatchEvent(new Event('input'));
+                                        showToast(`Erro no arquivo ${file.name}: ${res.erro || "Desconhecido"}`, "error");
+                                    }
+                                } catch (err) {
+                                    showToast(`Falha ao ler resposta do servidor para ${file.name}`, "error");
+                                }
+                            } else {
+                                const currentLines = textarea.value.split('\n');
+                                currentLines[startLineIndex + index] = `[Erro no upload: ${file.name}]`;
+                                textarea.value = currentLines.join('\n');
+                                textarea.dispatchEvent(new Event('input'));
+                                try {
+                                    const res = JSON.parse(xhr.responseText);
+                                    showToast(`Falha no upload de ${file.name}: ${res.erro || xhr.statusText}`, "error");
+                                } catch (e) {
+                                    showToast(`Erro no arquivo ${file.name} (Status: ${xhr.status})`, "error");
+                                }
+                            }
+                            completedCount++;
+                            updateGlobalProgress();
+                            resolve();
+                        };
+
+                        xhr.onerror = function () {
+                            const currentLines = textarea.value.split('\n');
+                            currentLines[startLineIndex + index] = `[Erro de rede: ${file.name}]`;
+                            textarea.value = currentLines.join('\n');
+                            textarea.dispatchEvent(new Event('input'));
+
+                            showToast(`Erro de rede no upload de ${file.name}`, "error");
+                            completedCount++;
+                            updateGlobalProgress();
+                            resolve();
+                        };
+
+                        xhr.send(formData);
+                    });
+                };
+
+                // Se os bots e o canal estiverem configurados, podemos rodar múltiplos uploads paralelos (concorrência = bots + 1). Caso contrário, 1 por vez.
+                const concurrencyLimit = hasBotConfig ? (botTokens.length + 1) : 1;
+                const queue = [...files.entries()];
+                
+                const workers = Array(Math.min(concurrencyLimit, files.length)).fill(null).map(async () => {
+                    while (queue.length > 0) {
+                        const [index, file] = queue.shift();
+                        await uploadSingleFile(file, index);
+                    }
+                });
+
+                await Promise.all(workers);
+
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Enviar';
+                progressBox.classList.add('hidden');
+                progressBar.style.width = '0%';
+
+                if (successCount === files.length) {
+                    showToast("Todos os vídeos foram enviados e convertidos com sucesso!", "success");
+                } else if (successCount > 0) {
+                    showToast(`Concluído: ${successCount} de ${files.length} vídeos convertidos com sucesso.`, "warning");
+                } else {
+                    showToast("Falha ao enviar os vídeos.", "error");
+                }
+
+                fileInput.value = '';
+                tg.handleFileChange(fileInput);
+            },
+
+            sendLocal: async () => {
+                const pathInput = document.getElementById('tgLocalPath');
+                const localPath = pathInput.value.trim();
+                if (!localPath) return showToast("Digite o caminho do arquivo local!", "warning");
+
+                const senha = await getValidPassword("Digite a senha do sistema para autorizar o upload local.");
+                if (!senha) return;
+
+                const btn = document.getElementById('btnTgLocalSend');
+                const progressBox = document.getElementById('tgProgressBox');
+                const progressBar = document.getElementById('tgProgressBar');
+                const percentText = document.getElementById('tgPercent');
+                const progressState = document.getElementById('tgProgressState');
+                
+                btn.disabled = true;
+                btn.innerHTML = '<div class="loader"></div> Enviando...';
+                
+                progressBox.classList.remove('hidden');
+                progressBar.style.width = '50%';
+                percentText.innerText = 'Processando...';
+                progressState.innerText = "Carregando e enviando para o Telegram...";
+
+                const headers = { 'Content-Type': 'application/json' };
+                const session = localStorage.getItem('fenixflix_tg_session');
+                if (session) {
+                    headers['X-Telegram-Session'] = session;
+                }
+
+                const botTokenInput = document.getElementById('tgBotToken').value.trim();
+                const channelId = document.getElementById('tgChannelId').value.trim();
+                const botTokens = botTokenInput ? botTokenInput.split(',').map(t => t.trim()).filter(Boolean) : [];
+                if (botTokens.length > 0) {
+                    headers['X-Telegram-Bot-Token'] = botTokens[0];
+                }
+                if (channelId) {
+                    headers['X-Telegram-Channel-Id'] = channelId;
+                }
+
+                try {
+                    const res = await fetch('/api/telegram/local-path', {
+                        method: 'POST',
+                        headers: headers,
+                        body: JSON.stringify({ localPath, senha })
+                    });
+
+                    const data = await res.json();
+                    if (res.ok && data.sucesso && data.link) {
+                        tg.appendLink(data.link);
+                        showToast("Vídeo local enviado e link capturado com sucesso!", "success");
+                        pathInput.value = '';
+                    } else {
+                        showToast(data.erro || "Falha no upload local.", "error");
+                    }
+                } catch (err) {
+                    showToast("Erro ao tentar conectar com a API de upload local.", "error");
+                } finally {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Enviar';
+                    progressBox.classList.add('hidden');
+                    progressBar.style.width = '0%';
+                    tg.updateUIStatus();
+                }
+            },
+
+            migrateAllLinks: async () => {
+                const textarea = document.getElementById('manualLinks');
+                const rawText = textarea.value.trim();
+                if (!rawText) return showToast("Cole os links de vídeo na caixa de texto primeiro!", "warning");
+
+                const lines = textarea.value.split('\n');
+                const urlsToMigrate = [];
+
+                for (let i = 0; i < lines.length; i++) {
+                    const line = lines[i].trim();
+                    if (!line) continue;
+                    const urlRegex = /(https?:\/\/[^\s]+)/;
+                    const match = line.match(urlRegex);
+                    if (match) {
+                        const url = match[0];
+                        if (url.includes('Fenixflix_bot.hf.space')) {
+                            continue;
+                        }
+                        urlsToMigrate.push({ index: i, line, url });
+                    }
+                }
+
+                if (urlsToMigrate.length === 0) {
+                    return showToast("Nenhum link externo pendente para conversão.", "info");
+                }
+
+                const botTokenInput = document.getElementById('tgBotToken').value.trim();
+                const channelId = document.getElementById('tgChannelId').value.trim();
+                const botTokens = botTokenInput ? botTokenInput.split(',').map(t => t.trim()).filter(Boolean) : [];
+                const hasBotConfig = botTokens.length > 0 && channelId;
+                const concurrencyLimit = hasBotConfig ? (botTokens.length + 1) : 1;
+
+                if (!confirm(`Deseja converter ${urlsToMigrate.length} link(s) externo(s) enviando-os para o Telegram?\nO processo executará até ${concurrencyLimit} conversões simultâneas.`)) {
+                    return;
+                }
+
+                const progressBox = document.getElementById('tgProgressBox');
+                const progressBar = document.getElementById('tgProgressBar');
+                const percentText = document.getElementById('tgPercent');
+                const progressState = document.getElementById('tgProgressState');
+
+                progressBox.classList.remove('hidden');
+                progressBar.style.width = '0%';
+                
+                let title = document.getElementById('cinemetaInfoTitle')?.innerText || 
+                            document.getElementById('seriesName')?.value || 
+                            document.getElementById('contentId')?.value || 'video';
+                title = title.split(' - ')[0];
+                const cleanTitle = title.replace(/[^a-zA-Z0-9]/g, '_').replace(/_+/g, '_');
+
+                let completedCount = 0;
+                let successCount = 0;
+
+                const updateMigrateProgress = () => {
+                    const percent = Math.round((completedCount / urlsToMigrate.length) * 100);
+                    progressBar.style.width = percent + '%';
+                    percentText.innerText = percent + '%';
+                    progressState.innerText = `Convertendo links (${completedCount}/${urlsToMigrate.length} concluídos)...`;
+                };
+
+                updateMigrateProgress();
+
+                const migrateSingleLink = async (item, index) => {
+                    let fileName = cleanTitle;
+                    const epMatch = item.line.match(/(S\d+E\d+|T\d+E\d+|\d+x\d+|\bE\d+\b|\bEP\d+\b)/i);
+                    if (epMatch) {
+                        fileName += '_' + epMatch[0].toUpperCase();
+                    }
+                    const label = item.line.replace(item.url, '').trim();
+                    const labelClean = label.replace(/[^a-zA-Z0-9]/g, '_').replace(/_+/g, '_');
+                    if (labelClean) {
+                        fileName += '_' + labelClean;
+                    }
+                    fileName += '.mp4';
+
+                    const headers = { 'Content-Type': 'application/json' };
+                    const session = localStorage.getItem('fenixflix_tg_session');
+                    if (session) {
+                        headers['X-Telegram-Session'] = session;
+                    }
+
+                    if (hasBotConfig) {
+                        const uploaderIndex = index % (botTokens.length + 1);
+                        if (uploaderIndex === 0) {
+                            headers['X-Telegram-Channel-Id'] = channelId;
+                        } else {
+                            const activeBotToken = botTokens[uploaderIndex - 1];
+                            headers['X-Telegram-Bot-Token'] = activeBotToken;
+                            headers['X-Telegram-Channel-Id'] = channelId;
+                        }
+                    } else if (channelId) {
+                        headers['X-Telegram-Channel-Id'] = channelId;
+                    }
+
+                    try {
+                        const res = await fetch('/api/telegram/migrate-url', {
+                            method: 'POST',
+                            headers: headers,
+                            body: JSON.stringify({ url: item.url, fileName: fileName })
+                        });
+
+                        const data = await res.json();
+                        if (res.ok && data.sucesso && data.link) {
+                            // Atualiza a linha correspondente no textarea em tempo real
+                            const currentLines = textarea.value.split('\n');
+                            currentLines[item.index] = item.line.replace(item.url, data.link);
+                            textarea.value = currentLines.join('\n');
+                            textarea.dispatchEvent(new Event('input'));
+                            successCount++;
+                        } else {
+                            showToast(`Erro ao converter link para ${fileName}: ${data.erro || 'Falha no servidor.'}`, "error");
+                        }
+                    } catch (err) {
+                        showToast(`Erro de rede ao conectar para o link de ${fileName}`, "error");
+                    } finally {
+                        completedCount++;
+                        updateMigrateProgress();
+                    }
+                };
+
+                const queue = [...urlsToMigrate.entries()];
+                
+                const workers = Array(Math.min(concurrencyLimit, urlsToMigrate.length)).fill(null).map(async () => {
+                    while (queue.length > 0) {
+                        const [index, item] = queue.shift();
+                        await migrateSingleLink(item, index);
+                    }
+                });
+
+                await Promise.all(workers);
+
+                progressBox.classList.add('hidden');
+                progressBar.style.width = '0%';
+                
+                if (successCount === urlsToMigrate.length) {
+                    showToast("Todos os links foram convertidos com sucesso!", "success");
+                } else if (successCount > 0) {
+                    showToast(`Conversão concluída: ${successCount} de ${urlsToMigrate.length} links convertidos com sucesso.`, "warning");
+                } else {
+                    showToast("Falha ao converter os links.", "error");
+                }
+            },
+
+            appendLink: (newLink) => {
+                const textarea = document.getElementById('manualLinks');
+                const currentValue = textarea.value.trim();
+                if (currentValue) {
+                    textarea.value = currentValue + '\n' + newLink;
+                } else {
+                    textarea.value = newLink;
+                }
+                textarea.dispatchEvent(new Event('input'));
+            }
+        };
 
         // --- MÓDULO 1: GERADOR DE JSON E GESTOR VISUAL ---
         const gen = {
@@ -1897,8 +2647,8 @@
                     if(response.ok && data.sucesso) {
                         cat.allItems = cat.allItems.filter(i => i.id !== id);
                         
-                        const btnMissing = document.getElementById('btn-missing_all');
-                        if (btnMissing && btnMissing.classList.contains('bg-white')) cat.filter('missing_all');
+                        const filterSelect = document.getElementById('cat-filter-type');
+                        if (filterSelect) cat.filter(filterSelect.value);
                         else cat.filter('all');
                         
                         cat.updateGlobalStats();
@@ -1954,20 +2704,9 @@
             },
 
             filter: (type) => {
-                document.querySelectorAll('.filter-btn').forEach(b => {
-                    b.classList.remove('bg-white', 'text-zinc-900', 'shadow-sm');
-                    b.classList.add('bg-zinc-900', 'border-zinc-800');
-                    if (b.id === 'btn-missing_all') {
-                        b.classList.add('text-amber-500'); 
-                    } else {
-                        b.classList.add('text-zinc-400');
-                    }
-                });
-
-                const activeBtn = document.getElementById(`btn-${type}`);
-                if(activeBtn) {
-                    activeBtn.classList.remove('bg-zinc-900', 'text-zinc-400', 'text-amber-500');
-                    activeBtn.classList.add('bg-white', 'text-zinc-900', 'shadow-sm');
+                const selectEl = document.getElementById('cat-filter-type');
+                if (selectEl && selectEl.value !== type) {
+                    selectEl.value = type;
                 }
 
                 if (type === 'all') {
@@ -2252,7 +2991,14 @@
                 // 1. Resolve imediatamente o que já estiver em cache local
                 reqProcessor.parsedItems.forEach(item => {
                     if (item.title === "Buscando..." && cache[item.id]) {
-                        item.title = cache[item.id];
+                        const cachedVal = cache[item.id];
+                        if (typeof cachedVal === 'object' && cachedVal !== null) {
+                            item.title = cachedVal.title;
+                            item.releaseDate = cachedVal.releaseDate;
+                        } else {
+                            item.title = cachedVal;
+                            item.releaseDate = "";
+                        }
                     }
                 });
                 
@@ -2282,13 +3028,17 @@
                         if(res.ok) {
                             const data = await res.json();
                             let title = "Título desconhecido";
+                            let releaseDate = "";
                             if (item.type === 'movie' && data.movie_results.length > 0) {
                                 title = data.movie_results[0].title;
+                                releaseDate = data.movie_results[0].release_date || "";
                             } else if (item.type === 'series' && data.tv_results.length > 0) {
                                 title = data.tv_results[0].name;
+                                releaseDate = data.tv_results[0].first_air_date || "";
                             }
                             item.title = title;
-                            cache[item.id] = title;
+                            item.releaseDate = releaseDate;
+                            cache[item.id] = { title: title, releaseDate: releaseDate };
                         } else {
                             item.title = "Não encontrado";
                         }
@@ -2317,8 +3067,14 @@
             updateUI: () => {
                 document.getElementById('req-total-lines').innerText = reqProcessor.totalLinesRead;
                 
+                const filterRelease = document.getElementById('req-filter-release')?.value || 'released';
+                const today = new Date().toISOString().split('T')[0];
+
                 let movies = 0; let series = 0; let totalRequests = 0;
                 reqProcessor.parsedItems.forEach(item => {
+                    if (filterRelease === 'released' && item.releaseDate && item.releaseDate > today) {
+                        return; // Oculta da contagem os não lançados se o filtro estiver ativo
+                    }
                     if(item.type === 'movie') movies++;
                     if(item.type === 'series') series++;
                     totalRequests += (item.count || 1);
@@ -2339,11 +3095,23 @@
                 const container = document.getElementById('req-results-container');
                 if (reqProcessor.parsedItems.size === 0) return;
 
+                // Atualiza contadores dinamicamente baseado nos filtros atuais
+                reqProcessor.updateUI();
+
                 const busca = (document.getElementById('req-search')?.value || '').toLowerCase();
                 const sortMode = document.getElementById('req-sort')?.value || 'count';
                 const filterType = document.getElementById('req-filter-type')?.value || 'all';
+                const filterRelease = document.getElementById('req-filter-release')?.value || 'released';
+
+                const today = new Date().toISOString().split('T')[0];
 
                 let items = Array.from(reqProcessor.parsedItems.values())
+                    .filter(item => {
+                        if (filterRelease === 'released' && item.releaseDate && item.releaseDate > today) {
+                            return false;
+                        }
+                        return true;
+                    })
                     .filter(item => filterType === 'all' || item.type === filterType)
                     .filter(item => !busca || item.id.toLowerCase().includes(busca) || (item.title||'').toLowerCase().includes(busca));
 
@@ -2355,6 +3123,11 @@
                 items.forEach(item => {
                     const typeName = item.type === 'movie' ? 'Filme' : 'Série';
                     const countBadge = (item.count > 1) ? `<span class="text-zinc-500 text-[10px] font-medium ml-2">${item.count} pedidos</span>` : '';
+
+                    const isUnreleased = item.releaseDate && item.releaseDate > today;
+                    const unreleasedBadge = isUnreleased 
+                        ? `<span class="text-[9px] text-amber-500 font-semibold uppercase tracking-widest border border-amber-500/30 bg-amber-500/10 px-1.5 rounded ml-1.5">Não Lançado (${item.releaseDate})</span>`
+                        : '';
 
                     let epsHtml = '';
                     if (item.type === 'series' && item.missingEps.size > 0) {
@@ -2377,6 +3150,7 @@
                                     <div class="flex items-center gap-2">
                                         <h4 class="font-medium text-white text-sm truncate">${item.title}</h4>
                                         <span class="text-[9px] text-zinc-500 uppercase tracking-widest border border-zinc-800 px-1.5 rounded">${typeName}</span>
+                                        ${unreleasedBadge}
                                     </div>
                                     <div class="flex items-center mt-1">
                                         <span class="font-mono text-[10px] text-zinc-600">${item.id}</span>
@@ -2647,6 +3421,7 @@
         document.addEventListener('DOMContentLoaded', async () => {
             await checkAdminSession();
             await cat.init();
+            await tg.init();
             
             const isLogged = sessionStorage.getItem('fenixflix_senha') !== null;
             if (isLogged) {
